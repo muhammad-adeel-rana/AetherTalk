@@ -57,7 +57,14 @@ const Dashboard = ({ user, onLogout }) => {
         // We will try to use the stored peerId.
 
         // Note: In production you'd want your own PeerServer to handle authentication/ownership of IDs.
-        const peer = new Peer(user.peerId);
+        const peer = new Peer(user.peerId, {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:global.stun.twilio.com:3478' }
+                ]
+            }
+        });
 
         peer.on('open', (id) => {
             console.log('My Peer ID:', id);
