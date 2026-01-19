@@ -314,25 +314,33 @@ const Dashboard = ({ user, onLogout }) => {
     const activeContact = contacts.find(c => c.id === activeContactId);
 
     return (
+    return (
         <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
-            <Sidebar
-                currentUser={user}
-                contacts={contacts}
-                activeContactId={activeContactId}
-                onSelectContact={setActiveContactId}
-                onAddContact={handleAddContact}
-                onLogout={onLogout}
-            />
-            <div className="flex-1 h-full">
+            {/* Sidebar: Hidden on Mobile if chat is open, Always visible on Desktop */}
+            <div className={`${activeContactId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col h-full`}>
+                <Sidebar
+                    currentUser={user}
+                    contacts={contacts}
+                    activeContactId={activeContactId}
+                    onSelectContact={setActiveContactId}
+                    onAddContact={handleAddContact}
+                    onLogout={onLogout}
+                />
+            </div>
+
+            {/* ChatArea: Hidden on Mobile if no chat open, Always visible on Desktop */}
+            <div className={`${!activeContactId ? 'hidden md:flex' : 'flex'} flex-1 h-full flex-col`}>
                 <ChatArea
                     activeContact={activeContact}
                     messages={activeMessages}
                     onSendMessage={handleSendMessage}
                     myId={user.peerId}
                     connectionStatus={connectionStatus}
+                    onBack={() => setActiveContactId(null)}
                 />
             </div>
         </div>
+    );
     );
 };
 

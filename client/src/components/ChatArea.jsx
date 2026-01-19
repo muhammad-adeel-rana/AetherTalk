@@ -1,27 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 
-const ChatArea = ({ activeContact, messages, onSendMessage, myId, connectionStatus }) => {
-    const [input, setInput] = useState('');
-    const messagesEndRef = useRef(null);
+const ChatArea = ({ activeContact, messages, onSendMessage, myId, connectionStatus, onBack }) => {
+    // ... (state)
 
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
-
-    const handleSend = () => {
-        if (!input.trim()) return;
-        onSendMessage(input);
-        setInput('');
-    };
-
-    if (!activeContact) {
-        return (
-            <div className="flex-1 flex items-center justify-center bg-gray-50 flex-col gap-4 text-gray-300">
-                <div className="text-6xl">💬</div>
-                <p className="font-medium text-lg">Select a contact to start chatting</p>
-            </div>
-        )
-    }
+    // ... (useEffect, handleSend, if check)
 
     return (
         <div className="flex-1 flex flex-col h-full bg-[#efeae2] relative">
@@ -29,6 +11,14 @@ const ChatArea = ({ activeContact, messages, onSendMessage, myId, connectionStat
 
             {/* Header */}
             <div className="bg-gray-100 border-b p-3 flex items-center gap-3 shadow-sm z-10">
+                {/* Back Button (Mobile Only) */}
+                <button
+                    onClick={onBack}
+                    className="md:hidden text-gray-600 mr-1"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                </button>
+
                 <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-lg">
                     {activeContact.name ? activeContact.name[0].toUpperCase() : activeContact.id.substring(0, 2).toUpperCase()}
                 </div>
