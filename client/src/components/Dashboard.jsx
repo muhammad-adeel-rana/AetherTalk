@@ -9,7 +9,6 @@ const SECRET_KEY = "my-super-secret-demo-key";
 
 const Dashboard = ({ user, onLogout }) => {
     const [contacts, setContacts] = useState(() => {
-        // Lazy Init: Load from LS immediately to prevent overwriting with empty defaults
         const saved = localStorage.getItem(`chat_data_${user.username}`);
         return saved ? JSON.parse(saved).contacts || [] : [];
     });
@@ -18,9 +17,37 @@ const Dashboard = ({ user, onLogout }) => {
         return saved ? JSON.parse(saved).chats || {} : {};
     });
     const [connectionStatus, setConnectionStatus] = useState('disconnected');
+    const [myPrivateKey, setMyPrivateKey] = useState(null);
 
     const peerRef = useRef(null);
     const connectionsRef = useRef({}); // Map: contactId -> DataConnection
+    // Used to track active contact ID for status updates
+    const [activeContactId, setActiveContactId] = useState(null);
+
+    // Load Private Key on mount
+    useEffect(() => {
+        const loadKey = async () => {
+            const keyJwkStr = localStorage.getItem(`private_key_${user.username}`);
+            if (keyJwkStr) {
+                try {
+                    const key = await importKey(JSON.parse(keyJwkStr), "sign");
+                    setMyPrivateKey(key);
+                    console.log("Private Key Loaded");
+                } catch (e) {
+                    console.error("Failed to load private key", e);
+                }
+            }
+        };
+        loadKey();
+    }, [user.username]);
+
+    // Save Data to LocalStorage on change
+    useEffect(() => {
+        if (user.username) {
+            const data = { contacts, chats };
+            localStorage.setItem(`chat_data_${user.username}`, JSON.stringify(data));
+        }
+    }, [contacts, chats, user.username]);
 
     // Update status when active contact changes
     useEffect(() => {
@@ -36,9 +63,45 @@ const Dashboard = ({ user, onLogout }) => {
         }
     }, [activeContactId]);
 
-    // ... (Loading keys etc)
+    // Initialize PeerJS
+    useEffect(() => {
+        const peer = new Peer(user.peerId, {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:global.stun.twilio.com:3478' }
+                ]
+            }
+        });
 
-    // ... (Peer Setup)
+        peer.on('open', (id) => {
+            console.log('My Peer ID:', id);
+        });
+
+        peer.on('connection', (conn) => {
+            console.log("Incoming connection from:", conn.peer);
+            setupConnection(conn);
+        });
+
+        peer.on('error', (err) => {
+            console.error("PeerJS Error:", err);
+            if (err.type === 'peer-unavailable') {
+                alert(`User ${err.message.replace('Could not connect to peer ', '')} is offline or does not exist.`);
+            } else if (err.type === 'unavailable-id') {
+                alert(`ID ${user.peerId} is taken. Try refreshing.`);
+            } else if (err.type === 'network') {
+                alert("Network Error: Could not connect to signaling server.");
+            } else {
+                alert(`Connection Error: ${err.message}`);
+            }
+        });
+
+        peerRef.current = peer;
+
+        return () => {
+            peer.destroy();
+        };
+    }, [user.peerId]);
 
     const setupConnection = (conn) => {
         connectionsRef.current[conn.peer] = conn;
@@ -84,14 +147,88 @@ const Dashboard = ({ user, onLogout }) => {
         });
     };
 
-    // ... (Handle Incoming)
+    const handleIncomingMessage = async (senderId, payload) => {
+        // 1. Check if it's a Handshake (JSON)
+        try {
+            if (typeof payload === 'string' && payload.startsWith('{')) {
+                const data = JSON.parse(payload);
+                if (data.type === 'handshake' && data.publicKey) {
+                    console.log(`🔑 Handshake received from ${senderId}`);
+                    const users = JSON.parse(localStorage.getItem('chat_users') || '{}');
+                    if (!users[senderId]) {
+                        users[senderId] = { username: senderId, peerId: senderId };
+                    }
+                    users[senderId].publicKey = data.publicKey;
+                    localStorage.setItem('chat_users', JSON.stringify(users));
+                    return;
+                }
+            }
+        } catch (e) { /* Not a handshake */ }
+
+        try {
+            const bytes = CryptoJS.AES.decrypt(payload, SECRET_KEY);
+            const originalString = bytes.toString(CryptoJS.enc.Utf8);
+
+            if (originalString) {
+                const { text, time, signature } = JSON.parse(originalString);
+
+                let isVerified = false;
+                const allUsers = JSON.parse(localStorage.getItem('chat_users') || '{}');
+                const senderUser = Object.values(allUsers).find(u => u.peerId === senderId);
+
+                if (senderUser && senderUser.publicKey && signature) {
+                    try {
+                        const publicKey = await importKey(senderUser.publicKey, "verify");
+                        isVerified = await verifyMessage(publicKey, text + time, signature);
+                        console.log(`✅ Signature Verified for ${senderId}`);
+                    } catch (e) {
+                        console.error("Verification failed", e);
+                    }
+                } else {
+                    console.warn("Cannot verify: Missing public key or signature. Handshake might be needed.");
+                }
+
+                setChats(prev => {
+                    const chatHistory = prev[senderId] || [];
+                    return {
+                        ...prev,
+                        [senderId]: [...chatHistory, { sender: senderId, text, time, isVerified }]
+                    };
+                });
+
+                updateContactLastMessage(senderId, text, time);
+
+                setContacts(prev => {
+                    if (!prev.find(c => c.id === senderId)) {
+                        return [...prev, {
+                            id: senderId,
+                            name: senderUser ? senderUser.username : senderId.substring(0, 6),
+                            lastMessage: text,
+                            lastMessageTime: time
+                        }];
+                    }
+                    return prev;
+                });
+            }
+        } catch (err) {
+            console.error("Decryption failed:", err);
+        }
+    };
+
+    const updateContactLastMessage = (contactId, text, time) => {
+        setContacts(prev => prev.map(c => {
+            if (c.id === contactId) {
+                return { ...c, lastMessage: text, lastMessageTime: time };
+            }
+            return c;
+        }));
+    };
 
     const handleSendMessage = async (text) => {
         if (!activeContactId) return;
 
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        // SIGN MESSAGE
         let signature = null;
         if (myPrivateKey) {
             try {
@@ -101,7 +238,6 @@ const Dashboard = ({ user, onLogout }) => {
             }
         }
 
-        // Update local chat
         const newMsg = { sender: 'me', text, time, isVerified: true };
         setChats(prev => ({
             ...prev,
@@ -110,7 +246,6 @@ const Dashboard = ({ user, onLogout }) => {
 
         updateContactLastMessage(activeContactId, text, time);
 
-        // Send to peer
         let conn = connectionsRef.current[activeContactId];
 
         const sendData = (connection) => {
@@ -123,18 +258,14 @@ const Dashboard = ({ user, onLogout }) => {
         if (conn && conn.open) {
             sendData(conn);
         } else {
-            // Connect if not connected
             console.log(`Connecting to ${activeContactId}...`);
             setConnectionStatus('connecting');
             conn = peerRef.current.connect(activeContactId);
             setupConnection(conn);
 
-            // Add a timeout alert if it takes too long
             setTimeout(() => {
                 if (!conn.open) {
                     console.warn("Connection timeout");
-                    // We don't force status change here to avoid flickering if it's just slow, 
-                    // but commonly 5s is enough to know if it failed silently.
                 }
             }, 5000);
 
@@ -145,7 +276,10 @@ const Dashboard = ({ user, onLogout }) => {
     };
 
     const handleAddContact = (contactId) => {
-        // ...
+        setContacts(prev => [
+            ...prev,
+            { id: contactId, name: `User ${contactId.substring(0, 4)}`, lastMessage: '', lastMessageTime: '' }
+        ]);
     };
 
     const activeMessages = activeContactId ? (chats[activeContactId] || []) : [];
@@ -167,7 +301,7 @@ const Dashboard = ({ user, onLogout }) => {
                     messages={activeMessages}
                     onSendMessage={handleSendMessage}
                     myId={user.peerId}
-                    connectionStatus={connectionStatus} // Pass status
+                    connectionStatus={connectionStatus}
                 />
             </div>
         </div>
