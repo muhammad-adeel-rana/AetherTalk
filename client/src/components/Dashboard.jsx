@@ -78,7 +78,6 @@ const Dashboard = ({ user, onLogout }) => {
     }, [activeContactId]);
 
     // Initialize PeerJS
-    // Initialize PeerJS
     useEffect(() => {
         let peer = null;
         let retryTimeout = null;
@@ -380,7 +379,6 @@ const Dashboard = ({ user, onLogout }) => {
                 />
             </div>
         </div>
-    );
     );
 };
 
