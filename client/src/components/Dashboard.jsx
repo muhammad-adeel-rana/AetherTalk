@@ -104,16 +104,21 @@ const Dashboard = ({ user, onLogout }) => {
             peer.on('connection', (conn) => {
                 console.log("Incoming connection from:", conn.peer);
 
-                // Duplicate Check: If we already have a healthy connection, typically we ignore or check time.
-                // But PeerJS might send a new one if the old one died silently.
+                // Anti-Glare (Race Condition) Handling:
+                // If we are currently trying to connect to this peer (outgoing), 
+                // we should "yield" and accept/use this incoming connection instead.
                 const existing = connectionsRef.current[conn.peer];
-                if (existing && existing.open) {
-                    console.log(`Already connected to ${conn.peer}, keeping existing.`);
-                    // Ideally we might accept the new one if the old one is stale, 
-                    // but for now let's assume valid. 
-                    // Actually, usually the 'newer' one is better if the old one was silent.
-                    // Let's close the old one to avoid conflict.
-                    existing.close();
+                if (existing) {
+                    if (existing.open) {
+                        console.log(`Already connected to ${conn.peer}, keeping EXISTING (Open).`);
+                        conn.close(); // Reject new if we have a happy open channel
+                        return; // Don't setup new
+                    } else {
+                        // Existing is connecting/pending. Abandon it in favor of this incoming one.
+                        // This resolves 'Glare' where both sides try to connect at once.
+                        console.log(`Pending outgoing connection to ${conn.peer} found. Abandoning it for Incoming.`);
+                        existing.close();
+                    }
                 }
                 setupConnection(conn);
             });
