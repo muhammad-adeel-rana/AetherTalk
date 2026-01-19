@@ -88,7 +88,11 @@ const Dashboard = ({ user, onLogout }) => {
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:global.stun.twilio.com:3478' }
+                        { urls: 'stun:global.stun.twilio.com:3478' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' }
                     ]
                 }
             });
@@ -142,7 +146,12 @@ const Dashboard = ({ user, onLogout }) => {
         const sendHandshake = () => {
             if (user.publicKey) {
                 console.log(`🤝 Sending Handshake to ${conn.peer}`);
-                const handshake = JSON.stringify({ type: 'handshake', publicKey: user.publicKey });
+                // Include Username in Handshake
+                const handshake = JSON.stringify({
+                    type: 'handshake',
+                    publicKey: user.publicKey,
+                    username: user.username
+                });
                 conn.send(handshake);
             }
         };
@@ -187,7 +196,22 @@ const Dashboard = ({ user, onLogout }) => {
                         users[senderId] = { username: senderId, peerId: senderId };
                     }
                     users[senderId].publicKey = data.publicKey;
+                    // Update username in registry if provided
+                    if (data.username) {
+                        users[senderId].username = data.username;
+                    }
                     localStorage.setItem('chat_users', JSON.stringify(users));
+
+                    // Update Contact Name in UI
+                    if (data.username) {
+                        setContacts(prev => prev.map(c => {
+                            if (c.id === senderId) {
+                                // Only update if it's still a placeholder or ID
+                                return { ...c, name: data.username };
+                            }
+                            return c;
+                        }));
+                    }
                     return;
                 }
             }
@@ -313,7 +337,6 @@ const Dashboard = ({ user, onLogout }) => {
     const activeMessages = activeContactId ? (chats[activeContactId] || []) : [];
     const activeContact = contacts.find(c => c.id === activeContactId);
 
-    return (
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
             {/* Sidebar: Hidden on Mobile if chat is open, Always visible on Desktop */}
