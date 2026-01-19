@@ -1,9 +1,27 @@
 import { useState, useRef, useEffect } from 'react';
 
 const ChatArea = ({ activeContact, messages, onSendMessage, myId, connectionStatus, onBack }) => {
-    // ... (state)
+    const [input, setInput] = useState('');
+    const messagesEndRef = useRef(null);
 
-    // ... (useEffect, handleSend, if check)
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
+    const handleSend = () => {
+        if (!input.trim()) return;
+        onSendMessage(input);
+        setInput('');
+    };
+
+    if (!activeContact) {
+        return (
+            <div className="flex-1 flex items-center justify-center bg-gray-50 flex-col gap-4 text-gray-300">
+                <div className="text-6xl">💬</div>
+                <p className="font-medium text-lg">Select a contact to start chatting</p>
+            </div>
+        )
+    }
 
     return (
         <div className="flex-1 flex flex-col h-full bg-[#efeae2] relative">
@@ -53,14 +71,7 @@ const ChatArea = ({ activeContact, messages, onSendMessage, myId, connectionStat
                 {(connectionStatus === 'disconnected' || connectionStatus === 'error') && (
                     <button
                         onClick={() => {
-                            // This is a hacky way to trigger retry in Dashboard
-                            // Ideally pass a onRetry prop. 
-                            // Since we don't have that prop yet, let's just show a visual indicator 
-                            // or user can re-select contact.
-                            // Wait, we need to pass sending message or new prop.
-                            // Let's rely on user clicking contact again or typing.
-                            // Actually, let's allow prop.
-                            if (onSendMessage) onSendMessage(''); // Trigger logic? No empty check blocks it.
+                            if (onSendMessage) onSendMessage('');
                         }}
                         className="ml-auto text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200"
                     >
