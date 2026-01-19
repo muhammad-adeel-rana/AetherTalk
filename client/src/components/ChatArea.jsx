@@ -20,10 +20,10 @@ const ChatArea = ({ activeContact, messages, onSendMessage, myId, connectionStat
                 </button>
 
                 <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-lg">
-                    {activeContact.name ? activeContact.name[0].toUpperCase() : activeContact.id.substring(0, 2).toUpperCase()}
+                    {activeContact?.name ? activeContact.name[0].toUpperCase() : (activeContact?.id ? activeContact.id.substring(0, 2).toUpperCase() : '?')}
                 </div>
                 <div>
-                    <h3 className="font-semibold text-gray-800">{activeContact.name || activeContact.id}</h3>
+                    <h3 className="font-semibold text-gray-800">{activeContact?.name || activeContact?.id || 'Unknown'}</h3>
                     <p className="text-xs flex items-center gap-1">
                         {/* Status Indicator */}
                         {connectionStatus === 'connected' && (

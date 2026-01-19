@@ -90,12 +90,12 @@ const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAd
                         >
                             <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">
                                 {/* Use name if available, else first 2 chars of ID */}
-                                {contact.name ? contact.name[0].toUpperCase() : contact.id.substring(0, 2).toUpperCase()}
+                                {contact?.name ? contact.name[0].toUpperCase() : (contact?.id ? contact.id.substring(0, 2).toUpperCase() : '?')}
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-baseline mb-1">
                                     <h4 className="font-semibold text-gray-800 truncate">
-                                        {contact.name || contact.id}
+                                        {contact?.name || contact?.id || 'Unknown'}
                                     </h4>
                                     {contact.lastMessageTime && (
                                         <span className="text-[10px] text-gray-400">
