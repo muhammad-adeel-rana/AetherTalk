@@ -49,18 +49,32 @@ const Dashboard = ({ user, onLogout }) => {
         }
     }, [contacts, chats, user.username]);
 
-    // Update status when active contact changes
+    // Update status when active contact changes & Auto-Connect
     useEffect(() => {
         if (!activeContactId) {
             setConnectionStatus('disconnected');
             return;
         }
-        const conn = connectionsRef.current[activeContactId];
-        if (conn && conn.open) {
-            setConnectionStatus('connected');
-        } else {
-            setConnectionStatus('disconnected');
-        }
+
+        const checkConnection = () => {
+            const conn = connectionsRef.current[activeContactId];
+            if (conn && conn.open) {
+                setConnectionStatus('connected');
+            } else {
+                setConnectionStatus('disconnected');
+                // Auto-Connect attempt if we are PeerReady
+                if (peerRef.current && !conn) {
+                    console.log(`Auto-connecting to ${activeContactId}...`);
+                    setConnectionStatus('connecting');
+                    const newConn = peerRef.current.connect(activeContactId);
+                    setupConnection(newConn);
+                }
+            }
+        };
+
+        checkConnection();
+        // Optional: Polling every few seconds to ensure connection?
+        // For now, let's just do it on switch.
     }, [activeContactId]);
 
     // Initialize PeerJS
