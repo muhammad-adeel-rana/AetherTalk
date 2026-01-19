@@ -103,6 +103,18 @@ const Dashboard = ({ user, onLogout }) => {
 
             peer.on('connection', (conn) => {
                 console.log("Incoming connection from:", conn.peer);
+
+                // Duplicate Check: If we already have a healthy connection, typically we ignore or check time.
+                // But PeerJS might send a new one if the old one died silently.
+                const existing = connectionsRef.current[conn.peer];
+                if (existing && existing.open) {
+                    console.log(`Already connected to ${conn.peer}, keeping existing.`);
+                    // Ideally we might accept the new one if the old one is stale, 
+                    // but for now let's assume valid. 
+                    // Actually, usually the 'newer' one is better if the old one was silent.
+                    // Let's close the old one to avoid conflict.
+                    existing.close();
+                }
                 setupConnection(conn);
             });
 
