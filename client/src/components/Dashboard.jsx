@@ -78,42 +78,56 @@ const Dashboard = ({ user, onLogout }) => {
     }, [activeContactId]);
 
     // Initialize PeerJS
+    // Initialize PeerJS
     useEffect(() => {
-        const peer = new Peer(user.peerId, {
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' }
-                ]
-            }
-        });
+        let peer = null;
+        let retryTimeout = null;
 
-        peer.on('open', (id) => {
-            console.log('My Peer ID:', id);
-        });
+        const initializePeer = () => {
+            peer = new Peer(user.peerId, {
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' }
+                    ]
+                }
+            });
 
-        peer.on('connection', (conn) => {
-            console.log("Incoming connection from:", conn.peer);
-            setupConnection(conn);
-        });
+            peer.on('open', (id) => {
+                console.log('My Peer ID:', id);
+            });
 
-        peer.on('error', (err) => {
-            console.error("PeerJS Error:", err);
-            if (err.type === 'peer-unavailable') {
-                alert(`User ${err.message.replace('Could not connect to peer ', '')} is offline or does not exist.`);
-            } else if (err.type === 'unavailable-id') {
-                alert(`ID ${user.peerId} is taken. Try refreshing.`);
-            } else if (err.type === 'network') {
-                alert("Network Error: Could not connect to signaling server.");
-            } else {
-                alert(`Connection Error: ${err.message}`);
-            }
-        });
+            peer.on('connection', (conn) => {
+                console.log("Incoming connection from:", conn.peer);
+                setupConnection(conn);
+            });
 
-        peerRef.current = peer;
+            peer.on('error', (err) => {
+                console.error("PeerJS Error:", err);
+                if (err.type === 'peer-unavailable') {
+                    // This error is about the *target* peer, not us.
+                    // We handle this in the connection logic usually, but good to know.
+                } else if (err.type === 'unavailable-id') {
+                    console.warn(`ID ${user.peerId} is taken. Retrying in 2s...`);
+                    // Retry initialization
+                    if (retryTimeout) clearTimeout(retryTimeout);
+                    retryTimeout = setTimeout(() => {
+                        console.log("Retrying Peer Init...");
+                        initializePeer();
+                    }, 2000);
+                } else if (err.type === 'network') {
+                    console.error("Network Error - Signaling Server Unreachable");
+                }
+            });
+
+            peerRef.current = peer;
+        };
+
+        initializePeer();
 
         return () => {
-            peer.destroy();
+            if (retryTimeout) clearTimeout(retryTimeout);
+            if (peer) peer.destroy();
         };
     }, [user.peerId]);
 
