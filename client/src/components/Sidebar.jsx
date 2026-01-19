@@ -9,19 +9,25 @@ const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAd
         e.preventDefault();
         if (!newContactId.trim()) return;
 
+        // Smart ID Handling: If user types just a number, assume it's a phone number and add prefix
+        let targetId = newContactId.trim();
+        if (/^\d+$/.test(targetId)) {
+            targetId = `phone-${targetId}`;
+        }
+
         // Check if adding self
-        if (newContactId === currentUser.peerId) {
+        if (targetId === currentUser.peerId) {
             setAddError("You cannot add yourself.");
             return;
         }
 
         // Check if already exists
-        if (contacts.find(c => c.id === newContactId)) {
+        if (contacts.find(c => c.id === targetId)) {
             setAddError("Contact already exists.");
             return;
         }
 
-        onAddContact(newContactId);
+        onAddContact(targetId);
         setNewContactId('');
         setShowAddModal(false);
         setAddError('');
@@ -124,7 +130,7 @@ const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAd
                         <form onSubmit={handleAddContact}>
                             <input
                                 className="w-full border rounded px-3 py-2 mb-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="Enter Friend's ID"
+                                placeholder="Enter Friend's Phone Number"
                                 value={newContactId}
                                 onChange={(e) => setNewContactId(e.target.value)}
                                 autoFocus

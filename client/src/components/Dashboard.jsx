@@ -71,10 +71,14 @@ const Dashboard = ({ user, onLogout }) => {
 
         peer.on('error', (err) => {
             console.error("PeerJS Error:", err);
-            // If ID is taken, we might need to handle that.
-            // For this demo, let's assume it works or alert user.
-            if (err.type === 'unavailable-id') {
-                alert(`Could not connect with ID ${user.peerId}. It might be in use.`);
+            if (err.type === 'peer-unavailable') {
+                alert(`User ${err.message.replace('Could not connect to peer ', '')} is offline or does not exist.`);
+            } else if (err.type === 'unavailable-id') {
+                alert(`ID ${user.peerId} is taken. Try refreshing.`);
+            } else if (err.type === 'network') {
+                alert("Network Error: Could not connect to signaling server.");
+            } else {
+                alert(`Connection Error: ${err.message}`);
             }
         });
 
