@@ -1,9 +1,11 @@
+```
 import { useState, useRef, useEffect } from 'react';
 
-const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onClearChat, onRenameContact, myId, connectionStatus, onBack, theme }) => {
+const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDeleteMessage, onClearChat, onRenameContact, myId, connectionStatus, onBack, theme }) => {
     const [input, setInput] = useState('');
     const [isRenaming, setIsRenaming] = useState(false);
     const [renameInput, setRenameInput] = useState('');
+    const fileInputRef = useRef(null);
 
     const messagesEndRef = useRef(null);
     // Track which message has the context menu open
@@ -41,9 +43,18 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
         }
     };
 
+    const handleFileSelect = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            onSendFile(file);
+        }
+        // Clear the input so the same file can be selected again
+        e.target.value = null;
+    };
+
     if (!activeContact) {
         return (
-            <div className={`flex-1 flex items-center justify-center flex-col gap-4 ${isDark ? 'bg-gray-900 text-gray-500' : 'bg-gray-50 text-gray-300'}`}>
+            <div className={`flex - 1 flex items - center justify - center flex - col gap - 4 ${ isDark ? 'bg-gray-900 text-gray-500' : 'bg-gray-50 text-gray-300' } `}>
                 <div className="text-6xl">💬</div>
                 <p className="font-medium text-lg">Select a contact to start chatting</p>
             </div>
@@ -51,14 +62,14 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
     }
 
     return (
-        <div className={`flex-1 flex flex-col h-full relative ${isDark ? 'bg-gray-900' : 'bg-[#efeae2]'}`}>
+        <div className={`flex - 1 flex flex - col h - full relative ${ isDark ? 'bg-gray-900' : 'bg-[#efeae2]' } `}>
 
             {/* Header */}
-            <div className={`border-b p-3 flex items-center gap-3 shadow-sm z-10 ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-100 border-gray-200'}`}>
+            <div className={`border - b p - 3 flex items - center gap - 3 shadow - sm z - 10 ${ isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-100 border-gray-200' } `}>
                 {/* Back Button (Mobile Only) */}
                 <button
                     onClick={onBack}
-                    className={`md:hidden mr-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
+                    className={`md:hidden mr - 1 ${ isDark ? 'text-gray-400' : 'text-gray-600' } `}
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </button>
@@ -70,7 +81,7 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
                     {isRenaming ? (
                         <div className="flex items-center gap-2">
                             <input
-                                className={`px-2 py-1 rounded border text-sm w-full outline-none focus:ring-2 focus:ring-green-500 ${isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'}`}
+                                className={`px - 2 py - 1 rounded border text - sm w - full outline - none focus: ring - 2 focus: ring - green - 500 ${ isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-black' } `}
                                 value={renameInput}
                                 onChange={(e) => setRenameInput(e.target.value)}
                                 autoFocus
@@ -88,10 +99,10 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
                         </div>
                     ) : (
                         <div className="flex items-center gap-2 group">
-                            <h3 className={`font-semibold truncate ${isDark ? 'text-white' : 'text-gray-800'}`}>{activeContact?.name || activeContact?.id || 'Unknown'}</h3>
+                            <h3 className={`font - semibold truncate ${ isDark ? 'text-white' : 'text-gray-800' } `}>{activeContact?.name || activeContact?.id || 'Unknown'}</h3>
                             <button
                                 onClick={() => {
-                                    setRenameInput(activeContact?.name || user?.username || '');
+                                    setRenameInput(activeContact?.name || '');
                                     setIsRenaming(true);
                                 }}
                                 className="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-gray-500"
@@ -153,16 +164,17 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
                     return (
                         <div
                             key={index}
-                            className={`max-w-[70%] flex flex-col group ${isMe ? 'self-end items-end' : 'self-start items-start'}`}
+                            className={`max - w - [70 %] flex flex - col group ${ isMe ? 'self-end items-end' : 'self-start items-start' } `}
                         >
                             <div
-                                className={`px-3 py-1.5 rounded-lg shadow-sm text-sm relative group cursor-pointer ${msg.deleted
-                                    ? 'bg-gray-200 text-gray-500 italic border border-gray-300'
-                                    : (isMe
-                                        ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none dark:bg-[#005c4b] dark:text-white'
-                                        : 'bg-white text-gray-800 rounded-tl-none dark:bg-[#202c33] dark:text-white'
-                                    )
-                                    }`}
+                                className={`px - 3 py - 1.5 rounded - lg shadow - sm text - sm relative group cursor - pointer ${
+    msg.deleted
+    ? 'bg-gray-200 text-gray-500 italic border border-gray-300'
+    : (isMe
+        ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none dark:bg-[#005c4b] dark:text-white'
+        : 'bg-white text-gray-800 rounded-tl-none dark:bg-[#202c33] dark:text-white'
+    )
+} `}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     // Toggle menu for this message
@@ -170,7 +182,35 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
                                 }}
                             >
                                 <div className="flex flex-col">
-                                    <span>{msg.deleted ? "🚫 This message was deleted" : msg.text}</span>
+                                    {msg.deleted ? (
+                                        <span>🚫 {isMe ? "You deleted this message" : "This message was deleted"}</span>
+                                    ) : (
+                                        msg.isFile ? (
+                                            <div className="flex flex-col gap-1">
+                                                {msg.fileType?.startsWith('image/') && msg.fileUrl ? (
+                                                    <img src={msg.fileUrl} alt={msg.text} className="max-w-full rounded-lg max-h-60 object-cover" />
+                                                ) : (
+                                                    <div className="flex items-center gap-2 p-2 bg-black/5 rounded">
+                                                        <div className="bg-blue-500 text-white p-2 rounded">📄</div>
+                                                        <div className="flex flex-col overflow-hidden">
+                                                            <span className="font-bold truncate max-w-[150px]">{msg.text}</span>
+                                                            <span className="text-xs opacity-70">Variable Size</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {msg.fileUrl ? (
+                                                     <a href={msg.fileUrl} download={msg.text} className="text-blue-500 hover:underline text-xs mt-1 block text-center" onClick={(e)=>e.stopPropagation()}>
+                                                        Download
+                                                     </a>
+                                                ) : (
+                                                    <span className="text-xs opacity-50 italic">Uploading...</span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span>{msg.text}</span>
+                                        )
+                                    )}
+
                                     {!msg.deleted && (
                                         <div className="flex items-center justify-end gap-1 mt-1 opacity-70">
                                             {msg.isVerified && (
@@ -187,7 +227,7 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
 
                                 {/* Context Menu */}
                                 {activeMessageMenu === msg.id && !msg.deleted && (
-                                    <div className={`absolute top-full mt-1 z-20 w-40 rounded shadow-lg py-1 text-sm ${isMe ? 'right-0' : 'left-0'} ${isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}>
+                                    <div className={`absolute top - full mt - 1 z - 20 w - 40 rounded shadow - lg py - 1 text - sm ${ isMe ? 'right-0' : 'left-0' } ${ isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-800' } `}>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -220,9 +260,18 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
             </div>
 
             {/* Input */}
-            <div className={`p-3 flex gap-2 items-center ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+            <div className={`p - 3 flex gap - 2 items - center ${ isDark ? 'bg-gray-800' : 'bg-gray-100' } `}>
+                <input type="file" ref={fileInputRef} hidden onChange={handleFileSelect} />
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 text-gray-500 hover:text-gray-600 transition"
+                    title="Attach File"
+                >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                </button>
+
                 <input
-                    className={`flex-1 py-3 px-4 rounded-lg outline-none text-sm border-none focus:ring-1 focus:ring-gray-300 ${isDark ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-white text-gray-800'}`}
+                    className={`flex - 1 py - 3 px - 4 rounded - lg outline - none text - sm border - none focus: ring - 1 focus: ring - gray - 300 ${ isDark ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-white text-gray-800' } `}
                     placeholder="Type a message..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
