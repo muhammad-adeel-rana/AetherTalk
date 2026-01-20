@@ -9,7 +9,10 @@ const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAd
 
     const handleAddContact = (e) => {
         e.preventDefault();
-        if (!newContactId.trim()) return;
+        if (!newContactId.trim() || !newContactName.trim()) {
+            setAddError("ID and Nickname are required.");
+            return;
+        }
 
         // Smart ID Handling
         let targetId = newContactId.trim();
@@ -132,8 +135,8 @@ const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAd
                             key={contact.id}
                             onClick={() => onSelectContact(contact.id)}
                             className={`p-4 flex items-center gap-3 cursor-pointer transition ${activeContactId === contact.id
-                                    ? (isDark ? 'bg-gray-800 border-r-4 border-blue-500' : 'bg-blue-50 border-r-4 border-blue-500')
-                                    : (isDark ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-50 text-gray-800')
+                                ? (isDark ? 'bg-gray-800 border-r-4 border-blue-500' : 'bg-blue-50 border-r-4 border-blue-500')
+                                : (isDark ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-50 text-gray-800')
                                 } ${isCollapsed ? 'justify-center px-2' : ''}`}
                             title={contact.name}
                         >
@@ -189,7 +192,7 @@ const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAd
                                 autoFocus
                             />
 
-                            <label className="text-xs font-semibold mb-1 block uppercase text-gray-500">Nickname (Optional)</label>
+                            <label className="text-xs font-semibold mb-1 block uppercase text-gray-500">Nickname (Required)</label>
                             <input
                                 className={`w-full border rounded px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-blue-500 outline-none ${isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
                                 placeholder="E.g. John Doe"

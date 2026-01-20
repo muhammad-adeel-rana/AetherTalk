@@ -49,7 +49,7 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
         }
     }, [contacts, chats, user.username]);
 
-    // Update status when active contact changes & Auto-Connect
+    // Update status when active contact changes & Auto-Connect & Polling
     useEffect(() => {
         if (!activeContactId) {
             setConnectionStatus('disconnected');
@@ -63,7 +63,7 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
             } else {
                 setConnectionStatus('disconnected');
                 // Auto-Connect attempt if we are PeerReady
-                if (peerRef.current && !conn) {
+                if (peerRef.current && peerRef.current.id && !conn) {
                     console.log(`Auto-connecting to ${activeContactId}...`);
                     setConnectionStatus('connecting');
                     const newConn = peerRef.current.connect(activeContactId);
@@ -73,8 +73,17 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
         };
 
         checkConnection();
-        // Optional: Polling every few seconds to ensure connection?
-        // For now, let's just do it on switch.
+
+        // Polling to retry connection if peer comes online later
+        const interval = setInterval(() => {
+            const conn = connectionsRef.current[activeContactId];
+            if (!conn || !conn.open) {
+                console.log(`Polling: Retrying connection to ${activeContactId}...`);
+                checkConnection();
+            }
+        }, 5000);
+
+        return () => clearInterval(interval);
     }, [activeContactId]);
 
     // Initialize PeerJS
@@ -87,11 +96,7 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:global.stun.twilio.com:3478' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' },
-                        { urls: 'stun:stun3.l.google.com:19302' },
-                        { urls: 'stun:stun4.l.google.com:19302' }
+                        { urls: 'stun:stun1.l.google.com:19302' }
                     ]
                 }
             });
