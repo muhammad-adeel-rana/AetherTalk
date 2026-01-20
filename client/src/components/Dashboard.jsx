@@ -115,22 +115,10 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                         conn.close();
                         return;
                     }
-
-                    // Glare Handling (Tie-Breaker)
-                    // If both sides dial at the same time, we need a deterministic way to pick ONE connection.
-                    // We compare Peer IDs. 
-                    // Case 1: My ID > Their ID -> I am "Impolite". I win. I keep my outgoing. I reject their incoming.
-                    // Case 2: My ID < Their ID -> I am "Polite". I yield. I close my outgoing. I accept their incoming.
-
-                    if (user.peerId > conn.peer) {
-                        console.log(`Glare Detected. I (${user.peerId}) > Them (${conn.peer}). I win. Keeping my outgoing. Closing incoming.`);
-                        conn.close();
-                        return; // Keep existing pending connection
-                    } else {
-                        console.log(`Glare Detected. I (${user.peerId}) < Them (${conn.peer}). I yield. Abandoning my outgoing. Accepting incoming.`);
-                        existing.close();
-                        // Proceed to setupConnection(conn) below
-                    }
+                    // If existing is not open (pending), we let them race.
+                    // We simply accept this new incoming connection as well.
+                    // The first one to 'open' will update the UI and become active.
+                    console.log(`Connection Race: Accepting incoming from ${conn.peer} to race with pending outgoing.`);
                 }
                 setupConnection(conn);
             });
@@ -197,6 +185,9 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
 
         conn.on('open', () => {
             console.log(`Connection to ${conn.peer} opened (Event)`);
+            // RACE WINNER: Make sure this successful connection is the one we use
+            connectionsRef.current[conn.peer] = conn;
+
             if (conn.peer === activeContactId) setConnectionStatus('connected');
             sendHandshake();
         });
