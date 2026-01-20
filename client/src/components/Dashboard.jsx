@@ -376,250 +376,248 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
             }
         } catch (e) { }
 
-        // ... keys decryption logic ...
-    };
 
-    try {
-        const bytes = CryptoJS.AES.decrypt(payload, SECRET_KEY);
-        const originalString = bytes.toString(CryptoJS.enc.Utf8);
-
-        if (originalString) {
-            const parsed = JSON.parse(originalString);
-
-            // Handle deletion
-            if (parsed.type === 'delete') {
-                setChats(prev => ({
-                    ...prev,
-                    [senderId]: (prev[senderId] || []).map(msg =>
-                        msg.id === parsed.targetId
-                            ? { ...msg, deleted: true, text: '' } // Clear text for security
-                            : msg
-                    )
-                }));
-                // Also update last msg if it was deleted
-                setContacts(prev => prev.map(c => {
-                    if (c.id === senderId && c.lastMessageId === parsed.targetId) {
-                        return { ...c, lastMessage: '🚫 This message was deleted' };
-                    }
-                    return c;
-                }));
-                return;
-            }
-
-            // Normal Message
-            const { id, text, time, signature } = parsed;
-
-            let isVerified = false;
-            const allUsers = JSON.parse(localStorage.getItem('chat_users') || '{}');
-            const senderUser = Object.values(allUsers).find(u => u.peerId === senderId);
-
-            if (senderUser && senderUser.publicKey && signature) {
-                try {
-                    const publicKey = await importKey(senderUser.publicKey, "verify");
-                    // Verify signature of ID + Text + Time
-                    isVerified = await verifyMessage(publicKey, id + text + time, signature);
-                    console.log(`✅ Signature Verified for ${senderId}`);
-                } catch (e) {
-                    console.error("Verification failed", e);
-                }
-            } else {
-                console.warn("Cannot verify: Missing public key or signature. Handshake might be needed.");
-            }
-
-            setChats(prev => {
-                const chatHistory = prev[senderId] || [];
-                // Dedup check (just in case)
-                if (chatHistory.find(m => m.id === id)) return prev;
-
-                return {
-                    ...prev,
-                    [senderId]: [...chatHistory, { id, sender: senderId, text, time, isVerified }]
-                };
-            });
-
-            updateContactLastMessage(senderId, text, time, id);
-
-            setContacts(prev => {
-                if (!prev.find(c => c.id === senderId)) {
-                    return [...prev, {
-                        id: senderId,
-                        name: senderUser ? senderUser.username : senderId.substring(0, 6),
-                        lastMessage: text,
-                        lastMessageTime: time,
-                        lastMessageId: id
-                    }];
-                }
-                return prev;
-            });
-        }
-    } catch (err) {
-        console.error("Decryption failed:", err);
-    }
-};
-
-const updateContactLastMessage = (contactId, text, time, msgId) => {
-    setContacts(prev => prev.map(c => {
-        if (c.id === contactId) {
-            return {
-                ...c,
-                lastMessage: text,
-                lastMessageTime: time,
-                lastMessageId: msgId
-            };
-        }
-        return c;
-    }));
-};
-
-const handleSendMessage = async (text) => {
-    if (!activeContactId) return;
-
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const id = crypto.randomUUID();
-
-    let signature = null;
-    if (myPrivateKey) {
         try {
-            // Sign ID as well to prevent replay/tampering
-            signature = await signMessage(myPrivateKey, id + text + time);
-        } catch (e) {
-            console.error("Signing failed", e);
+            const bytes = CryptoJS.AES.decrypt(payload, SECRET_KEY);
+            const originalString = bytes.toString(CryptoJS.enc.Utf8);
+
+            if (originalString) {
+                const parsed = JSON.parse(originalString);
+
+                // Handle deletion
+                if (parsed.type === 'delete') {
+                    setChats(prev => ({
+                        ...prev,
+                        [senderId]: (prev[senderId] || []).map(msg =>
+                            msg.id === parsed.targetId
+                                ? { ...msg, deleted: true, text: '' } // Clear text for security
+                                : msg
+                        )
+                    }));
+                    // Also update last msg if it was deleted
+                    setContacts(prev => prev.map(c => {
+                        if (c.id === senderId && c.lastMessageId === parsed.targetId) {
+                            return { ...c, lastMessage: '🚫 This message was deleted' };
+                        }
+                        return c;
+                    }));
+                    return;
+                }
+
+                // Normal Message
+                const { id, text, time, signature } = parsed;
+
+                let isVerified = false;
+                const allUsers = JSON.parse(localStorage.getItem('chat_users') || '{}');
+                const senderUser = Object.values(allUsers).find(u => u.peerId === senderId);
+
+                if (senderUser && senderUser.publicKey && signature) {
+                    try {
+                        const publicKey = await importKey(senderUser.publicKey, "verify");
+                        // Verify signature of ID + Text + Time
+                        isVerified = await verifyMessage(publicKey, id + text + time, signature);
+                        console.log(`✅ Signature Verified for ${senderId}`);
+                    } catch (e) {
+                        console.error("Verification failed", e);
+                    }
+                } else {
+                    console.warn("Cannot verify: Missing public key or signature. Handshake might be needed.");
+                }
+
+                setChats(prev => {
+                    const chatHistory = prev[senderId] || [];
+                    // Dedup check (just in case)
+                    if (chatHistory.find(m => m.id === id)) return prev;
+
+                    return {
+                        ...prev,
+                        [senderId]: [...chatHistory, { id, sender: senderId, text, time, isVerified }]
+                    };
+                });
+
+                updateContactLastMessage(senderId, text, time, id);
+
+                setContacts(prev => {
+                    if (!prev.find(c => c.id === senderId)) {
+                        return [...prev, {
+                            id: senderId,
+                            name: senderUser ? senderUser.username : senderId.substring(0, 6),
+                            lastMessage: text,
+                            lastMessageTime: time,
+                            lastMessageId: id
+                        }];
+                    }
+                    return prev;
+                });
+            }
+        } catch (err) {
+            console.error("Decryption failed:", err);
         }
-    }
-
-    const newMsg = { id, sender: 'me', text, time, isVerified: true };
-    setChats(prev => ({
-        ...prev,
-        [activeContactId]: [...(prev[activeContactId] || []), newMsg]
-    }));
-
-    updateContactLastMessage(activeContactId, text, time, id);
-
-    // Send over wire
-    // ... (connection logic reuse)
-    let conn = connectionsRef.current[activeContactId];
-
-    const sendData = (connection) => {
-        const dataPacket = JSON.stringify({ type: 'msg', id, text, time, signature });
-        const ciphertext = CryptoJS.AES.encrypt(dataPacket, SECRET_KEY).toString();
-        console.log("🔒 [DEMO] Sending Encrypted Payload:", ciphertext);
-        connection.send(ciphertext);
     };
 
-    if (conn && conn.open) {
-        sendData(conn);
-    } else {
-        // ... existing connect logic ...
-        // Simplified for brevity in this replace block, essentially same as before but using sendData
-        console.log(`Connecting to ${activeContactId}...`);
-        setConnectionStatus('connecting');
-        conn = peerRef.current.connect(activeContactId);
-        setupConnection(conn);
+    const updateContactLastMessage = (contactId, text, time, msgId) => {
+        setContacts(prev => prev.map(c => {
+            if (c.id === contactId) {
+                return {
+                    ...c,
+                    lastMessage: text,
+                    lastMessageTime: time,
+                    lastMessageId: msgId
+                };
+            }
+            return c;
+        }));
+    };
 
-        // Wait briefly for open
-        conn.on('open', () => sendData(conn));
-    }
-};
+    const handleSendMessage = async (text) => {
+        if (!activeContactId) return;
 
-// New Feature: Delete Message
-const handleDeleteMessage = (msgId, forEveryone) => {
-    if (!activeContactId) return;
+        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const id = crypto.randomUUID();
 
-    // 1. Delete locally
-    setChats(prev => ({
-        ...prev,
-        [activeContactId]: (prev[activeContactId] || []).map(msg =>
-            msg.id === msgId ? { ...msg, deleted: true, text: '' } : msg
-        )
-    }));
+        let signature = null;
+        if (myPrivateKey) {
+            try {
+                // Sign ID as well to prevent replay/tampering
+                signature = await signMessage(myPrivateKey, id + text + time);
+            } catch (e) {
+                console.error("Signing failed", e);
+            }
+        }
 
-    // 2. Send delete signal if forEveryone
-    if (forEveryone) {
-        const conn = connectionsRef.current[activeContactId];
-        if (conn && conn.open) {
-            const dataPacket = JSON.stringify({ type: 'delete', targetId: msgId });
+        const newMsg = { id, sender: 'me', text, time, isVerified: true };
+        setChats(prev => ({
+            ...prev,
+            [activeContactId]: [...(prev[activeContactId] || []), newMsg]
+        }));
+
+        updateContactLastMessage(activeContactId, text, time, id);
+
+        // Send over wire
+        // ... (connection logic reuse)
+        let conn = connectionsRef.current[activeContactId];
+
+        const sendData = (connection) => {
+            const dataPacket = JSON.stringify({ type: 'msg', id, text, time, signature });
             const ciphertext = CryptoJS.AES.encrypt(dataPacket, SECRET_KEY).toString();
-            conn.send(ciphertext);
+            console.log("🔒 [DEMO] Sending Encrypted Payload:", ciphertext);
+            connection.send(ciphertext);
+        };
+
+        if (conn && conn.open) {
+            sendData(conn);
+        } else {
+            // ... existing connect logic ...
+            // Simplified for brevity in this replace block, essentially same as before but using sendData
+            console.log(`Connecting to ${activeContactId}...`);
+            setConnectionStatus('connecting');
+            conn = peerRef.current.connect(activeContactId);
+            setupConnection(conn);
+
+            // Wait briefly for open
+            conn.on('open', () => sendData(conn));
         }
-    }
-};
+    };
 
-// New Feature: Clear/Delete Contact
-const handleClearChat = (contactId) => {
-    if (confirm("Are you sure you want to delete this contact and all messages?")) {
-        // Remove messages
-        setChats(prev => {
-            const newChats = { ...prev };
-            delete newChats[contactId];
-            return newChats;
-        });
-        // Remove contact
-        setContacts(prev => prev.filter(c => c.id !== contactId));
+    // New Feature: Delete Message
+    const handleDeleteMessage = (msgId, forEveryone) => {
+        if (!activeContactId) return;
 
-        // Go back
-        setActiveContactId(null);
-    }
-};
+        // 1. Delete locally
+        setChats(prev => ({
+            ...prev,
+            [activeContactId]: (prev[activeContactId] || []).map(msg =>
+                msg.id === msgId ? { ...msg, deleted: true, text: '' } : msg
+            )
+        }));
 
-// New Feature: Rename Contact Locally
-const handleRenameContact = (contactId, newName) => {
-    if (!newName.trim()) return;
-    setContacts(prev => prev.map(c => {
-        if (c.id === contactId) {
-            return { ...c, name: newName.trim() };
+        // 2. Send delete signal if forEveryone
+        if (forEveryone) {
+            const conn = connectionsRef.current[activeContactId];
+            if (conn && conn.open) {
+                const dataPacket = JSON.stringify({ type: 'delete', targetId: msgId });
+                const ciphertext = CryptoJS.AES.encrypt(dataPacket, SECRET_KEY).toString();
+                conn.send(ciphertext);
+            }
         }
-        return c;
-    }));
-};
+    };
 
-const handleAddContact = (contactId, contactName) => {
-    setContacts(prev => [
-        ...prev,
-        {
-            id: contactId,
-            name: contactName || `User ${contactId.substring(0, 4)}`,
-            lastMessage: '',
-            lastMessageTime: ''
+    // New Feature: Clear/Delete Contact
+    const handleClearChat = (contactId) => {
+        if (confirm("Are you sure you want to delete this contact and all messages?")) {
+            // Remove messages
+            setChats(prev => {
+                const newChats = { ...prev };
+                delete newChats[contactId];
+                return newChats;
+            });
+            // Remove contact
+            setContacts(prev => prev.filter(c => c.id !== contactId));
+
+            // Go back
+            setActiveContactId(null);
         }
-    ]);
-};
+    };
 
-const activeMessages = activeContactId ? (chats[activeContactId] || []) : [];
-const activeContact = contacts.find(c => c.id === activeContactId) || (activeContactId ? { id: activeContactId } : null);
+    // New Feature: Rename Contact Locally
+    const handleRenameContact = (contactId, newName) => {
+        if (!newName.trim()) return;
+        setContacts(prev => prev.map(c => {
+            if (c.id === contactId) {
+                return { ...c, name: newName.trim() };
+            }
+            return c;
+        }));
+    };
 
-return (
-    <div className={`flex h-screen overflow-hidden ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
-        {/* Sidebar: Hidden on Mobile if chat is open, Always visible on Desktop */}
-        <div className={`${activeContactId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col h-full border-r ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-            <Sidebar
-                user={user}
-                contacts={contacts}
-                activeContactId={activeContactId}
-                onSelectContact={setActiveContactId}
-                onAddContact={handleAddContact}
-                onLogout={onLogout}
-                theme={theme}
-                toggleTheme={toggleTheme}
-            />
+    const handleAddContact = (contactId, contactName) => {
+        setContacts(prev => [
+            ...prev,
+            {
+                id: contactId,
+                name: contactName || `User ${contactId.substring(0, 4)}`,
+                lastMessage: '',
+                lastMessageTime: ''
+            }
+        ]);
+    };
+
+    const activeMessages = activeContactId ? (chats[activeContactId] || []) : [];
+    const activeContact = contacts.find(c => c.id === activeContactId) || (activeContactId ? { id: activeContactId } : null);
+
+    return (
+        <div className={`flex h-screen overflow-hidden ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
+            {/* Sidebar: Hidden on Mobile if chat is open, Always visible on Desktop */}
+            <div className={`${activeContactId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col h-full border-r ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+                <Sidebar
+                    user={user}
+                    contacts={contacts}
+                    activeContactId={activeContactId}
+                    onSelectContact={setActiveContactId}
+                    onAddContact={handleAddContact}
+                    onLogout={onLogout}
+                    theme={theme}
+                    toggleTheme={toggleTheme}
+                />
+            </div>
+
+            {/* ChatArea: Hidden on Mobile if no chat open, Always visible on Desktop */}
+            <div className={`${!activeContactId ? 'hidden md:flex' : 'flex'} flex-1 h-full flex-col`}>
+                <ChatArea
+                    activeContact={activeContact}
+                    messages={activeMessages}
+                    onSendMessage={handleSendMessage}
+                    onSendFile={handleSendFile}
+                    onDeleteMessage={handleDeleteMessage}
+                    onClearChat={() => handleClearChat(activeContactId)}
+                    myId={user.peerId}
+                    connectionStatus={connectionStatus}
+                    onBack={() => setActiveContactId(null)}
+                    theme={theme}
+                />
+            </div>
         </div>
-
-        {/* ChatArea: Hidden on Mobile if no chat open, Always visible on Desktop */}
-        <div className={`${!activeContactId ? 'hidden md:flex' : 'flex'} flex-1 h-full flex-col`}>
-            <ChatArea
-                activeContact={activeContact}
-                messages={activeMessages}
-                onSendMessage={handleSendMessage}
-                onSendFile={handleSendFile}
-                onDeleteMessage={handleDeleteMessage}
-                onClearChat={() => handleClearChat(activeContactId)}
-                myId={user.peerId}
-                connectionStatus={connectionStatus}
-                onBack={() => setActiveContactId(null)}
-                theme={theme}
-            />
-        </div>
-    </div>
-);
+    );
 };
 
 export default Dashboard;
