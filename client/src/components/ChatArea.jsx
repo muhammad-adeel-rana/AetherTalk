@@ -1,4 +1,3 @@
-```
 import { useState, useRef, useEffect } from 'react';
 
 const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDeleteMessage, onClearChat, onRenameContact, myId, connectionStatus, onBack, theme }) => {
@@ -54,7 +53,7 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
 
     if (!activeContact) {
         return (
-            <div className={`flex - 1 flex items - center justify - center flex - col gap - 4 ${ isDark ? 'bg-gray-900 text-gray-500' : 'bg-gray-50 text-gray-300' } `}>
+            <div className={`flex-1 flex items-center justify-center flex-col gap-4 ${isDark ? 'bg-gray-900 text-gray-500' : 'bg-gray-50 text-gray-300'}`}>
                 <div className="text-6xl">💬</div>
                 <p className="font-medium text-lg">Select a contact to start chatting</p>
             </div>
@@ -62,14 +61,14 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
     }
 
     return (
-        <div className={`flex - 1 flex flex - col h - full relative ${ isDark ? 'bg-gray-900' : 'bg-[#efeae2]' } `}>
+        <div className={`flex-1 flex flex-col h-full relative ${isDark ? 'bg-gray-900' : 'bg-[#efeae2]'}`}>
 
             {/* Header */}
-            <div className={`border - b p - 3 flex items - center gap - 3 shadow - sm z - 10 ${ isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-100 border-gray-200' } `}>
+            <div className={`border-b p-3 flex items-center gap-3 shadow-sm z-10 ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-100 border-gray-200'}`}>
                 {/* Back Button (Mobile Only) */}
                 <button
                     onClick={onBack}
-                    className={`md:hidden mr - 1 ${ isDark ? 'text-gray-400' : 'text-gray-600' } `}
+                    className={`md:hidden mr-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}
                 >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 </button>
@@ -81,7 +80,7 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
                     {isRenaming ? (
                         <div className="flex items-center gap-2">
                             <input
-                                className={`px - 2 py - 1 rounded border text - sm w - full outline - none focus: ring - 2 focus: ring - green - 500 ${ isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-black' } `}
+                                className={`px-2 py-1 rounded border text-sm w-full outline-none focus:ring-2 focus:ring-green-500 ${isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'}`}
                                 value={renameInput}
                                 onChange={(e) => setRenameInput(e.target.value)}
                                 autoFocus
@@ -99,7 +98,7 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
                         </div>
                     ) : (
                         <div className="flex items-center gap-2 group">
-                            <h3 className={`font - semibold truncate ${ isDark ? 'text-white' : 'text-gray-800' } `}>{activeContact?.name || activeContact?.id || 'Unknown'}</h3>
+                            <h3 className={`font-semibold truncate ${isDark ? 'text-white' : 'text-gray-800'}`}>{activeContact?.name || activeContact?.id || 'Unknown'}</h3>
                             <button
                                 onClick={() => {
                                     setRenameInput(activeContact?.name || '');
@@ -164,17 +163,16 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
                     return (
                         <div
                             key={index}
-                            className={`max - w - [70 %] flex flex - col group ${ isMe ? 'self-end items-end' : 'self-start items-start' } `}
+                            className={`max-w-[70%] flex flex-col group ${isMe ? 'self-end items-end' : 'self-start items-start'}`}
                         >
                             <div
-                                className={`px - 3 py - 1.5 rounded - lg shadow - sm text - sm relative group cursor - pointer ${
-    msg.deleted
-    ? 'bg-gray-200 text-gray-500 italic border border-gray-300'
-    : (isMe
-        ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none dark:bg-[#005c4b] dark:text-white'
-        : 'bg-white text-gray-800 rounded-tl-none dark:bg-[#202c33] dark:text-white'
-    )
-} `}
+                                className={`px-3 py-1.5 rounded-lg shadow-sm text-sm relative group cursor-pointer ${msg.deleted
+                                        ? 'bg-gray-200 text-gray-500 italic border border-gray-300'
+                                        : (isMe
+                                            ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none dark:bg-[#005c4b] dark:text-white'
+                                            : 'bg-white text-gray-800 rounded-tl-none dark:bg-[#202c33] dark:text-white'
+                                        )
+                                    }`}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     // Toggle menu for this message
@@ -199,9 +197,9 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
                                                     </div>
                                                 )}
                                                 {msg.fileUrl ? (
-                                                     <a href={msg.fileUrl} download={msg.text} className="text-blue-500 hover:underline text-xs mt-1 block text-center" onClick={(e)=>e.stopPropagation()}>
+                                                    <a href={msg.fileUrl} download={msg.text} className="text-blue-500 hover:underline text-xs mt-1 block text-center" onClick={(e) => e.stopPropagation()}>
                                                         Download
-                                                     </a>
+                                                    </a>
                                                 ) : (
                                                     <span className="text-xs opacity-50 italic">Uploading...</span>
                                                 )}
@@ -227,7 +225,7 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
 
                                 {/* Context Menu */}
                                 {activeMessageMenu === msg.id && !msg.deleted && (
-                                    <div className={`absolute top - full mt - 1 z - 20 w - 40 rounded shadow - lg py - 1 text - sm ${ isMe ? 'right-0' : 'left-0' } ${ isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-800' } `}>
+                                    <div className={`absolute top-full mt-1 z-20 w-40 rounded shadow-lg py-1 text-sm ${isMe ? 'right-0' : 'left-0'} ${isDark ? 'bg-gray-700 text-white' : 'bg-white text-gray-800'}`}>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -260,7 +258,7 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
             </div>
 
             {/* Input */}
-            <div className={`p - 3 flex gap - 2 items - center ${ isDark ? 'bg-gray-800' : 'bg-gray-100' } `}>
+            <div className={`p-3 flex gap-2 items-center ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
                 <input type="file" ref={fileInputRef} hidden onChange={handleFileSelect} />
                 <button
                     onClick={() => fileInputRef.current?.click()}
@@ -271,7 +269,7 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
                 </button>
 
                 <input
-                    className={`flex - 1 py - 3 px - 4 rounded - lg outline - none text - sm border - none focus: ring - 1 focus: ring - gray - 300 ${ isDark ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-white text-gray-800' } `}
+                    className={`flex-1 py-3 px-4 rounded-lg outline-none text-sm border-none focus:ring-1 focus:ring-gray-300 ${isDark ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-white text-gray-800'}`}
                     placeholder="Type a message..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
