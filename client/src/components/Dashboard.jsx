@@ -184,7 +184,8 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                 const handshake = JSON.stringify({
                     type: 'handshake',
                     publicKey: user.publicKey,
-                    username: user.username
+                    username: user.username,
+                    displayName: user.displayName || user.username // Send Display Name
                 });
                 conn.send(handshake);
             }
@@ -233,18 +234,21 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                         users[senderId] = { username: senderId, peerId: senderId };
                     }
                     users[senderId].publicKey = data.publicKey;
-                    // Update username in registry if provided
-                    if (data.username) {
-                        users[senderId].username = data.username;
+
+                    // Update username/displayName in registry if provided
+                    const remoteName = data.displayName || data.username;
+                    if (remoteName) {
+                        users[senderId].displayName = remoteName;
+                        users[senderId].username = data.username || senderId; // Keep phone as username
                     }
                     localStorage.setItem('chat_users', JSON.stringify(users));
 
                     // Update Contact Name in UI
-                    if (data.username) {
+                    if (remoteName) {
                         setContacts(prev => prev.map(c => {
                             if (c.id === senderId) {
-                                // Only update if it's still a placeholder or ID
-                                return { ...c, name: data.username };
+                                // Update name to the one sent in handshake
+                                return { ...c, name: remoteName };
                             }
                             return c;
                         }));

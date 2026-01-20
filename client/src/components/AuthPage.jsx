@@ -4,6 +4,7 @@ import { generateKeyPair, exportKey } from '../utils/crypto';
 const AuthPage = ({ onLogin }) => {
     const [isLogin, setIsLogin] = useState(true);
     const [phone, setPhone] = useState('');
+    const [name, setName] = useState(''); // Display Name
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
@@ -20,6 +21,11 @@ const AuthPage = ({ onLogin }) => {
 
         if (!phone.trim() || !password.trim()) {
             setError("Please fill in all fields.");
+            return;
+        }
+
+        if (!isLogin && !name.trim()) {
+            setError("Display Name is required for signup.");
             return;
         }
 
@@ -63,7 +69,8 @@ const AuthPage = ({ onLogin }) => {
                 const peerId = `phone-${phone}`;
 
                 const newUser = {
-                    username: phone, // Still using 'username' prop for compatibility, but it stores phone
+                    username: phone, // Phone is the unique ID/Username
+                    displayName: name.trim().toUpperCase(), // Official Display Name
                     password,
                     peerId,
                     publicKey: publicKeyJwk
@@ -113,6 +120,19 @@ const AuthPage = ({ onLogin }) => {
                     </div>
 
                     <form onSubmit={handleAuth} className="space-y-4">
+                        {!isLogin && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00a884] focus:border-[#00a884] outline-none transition bg-gray-50 uppercase"
+                                    placeholder="e.g. ADEEL"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                />
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                             <input
