@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 
-const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onClearChat, myId, connectionStatus, onBack, theme }) => {
+const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onClearChat, onRenameContact, myId, connectionStatus, onBack, theme }) => {
     const [input, setInput] = useState('');
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [renameInput, setRenameInput] = useState('');
+
     const messagesEndRef = useRef(null);
     // Track which message has the context menu open
     const [activeMessageMenu, setActiveMessageMenu] = useState(null);
@@ -11,6 +14,12 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
+
+    // Reset renaming state when contact changes
+    useEffect(() => {
+        setIsRenaming(false);
+        setRenameInput('');
+    }, [activeContact?.id]);
 
     useEffect(() => {
         // Close menu on click elsewhere
@@ -23,6 +32,13 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
         if (!input.trim()) return;
         onSendMessage(input);
         setInput('');
+    };
+
+    const handleSaveRename = () => {
+        if (renameInput.trim()) {
+            onRenameContact(renameInput.trim());
+            setIsRenaming(false);
+        }
     };
 
     if (!activeContact) {
@@ -51,7 +67,40 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
                     {activeContact?.name ? activeContact.name[0].toUpperCase() : (activeContact?.id ? activeContact.id.substring(0, 2).toUpperCase() : '?')}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className={`font-semibold truncate ${isDark ? 'text-white' : 'text-gray-800'}`}>{activeContact?.name || activeContact?.id || 'Unknown'}</h3>
+                    {isRenaming ? (
+                        <div className="flex items-center gap-2">
+                            <input
+                                className={`px-2 py-1 rounded border text-sm w-full outline-none focus:ring-2 focus:ring-green-500 ${isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'}`}
+                                value={renameInput}
+                                onChange={(e) => setRenameInput(e.target.value)}
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveRename();
+                                    if (e.key === 'Escape') setIsRenaming(false);
+                                }}
+                            />
+                            <button onClick={handleSaveRename} className="text-green-500 hover:text-green-600">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                            </button>
+                            <button onClick={() => setIsRenaming(false)} className="text-red-500 hover:text-red-600">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 group">
+                            <h3 className={`font-semibold truncate ${isDark ? 'text-white' : 'text-gray-800'}`}>{activeContact?.name || activeContact?.id || 'Unknown'}</h3>
+                            <button
+                                onClick={() => {
+                                    setRenameInput(activeContact?.name || user?.username || '');
+                                    setIsRenaming(true);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-gray-500"
+                                title="Rename Contact"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                            </button>
+                        </div>
+                    )}
                     <p className="text-xs flex items-center gap-1">
                         {/* Status Indicator */}
                         {connectionStatus === 'connected' && (
@@ -108,11 +157,11 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onDeleteMessage, onC
                         >
                             <div
                                 className={`px-3 py-1.5 rounded-lg shadow-sm text-sm relative group cursor-pointer ${msg.deleted
-                                        ? 'bg-gray-200 text-gray-500 italic border border-gray-300'
-                                        : (isMe
-                                            ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none dark:bg-[#005c4b] dark:text-white'
-                                            : 'bg-white text-gray-800 rounded-tl-none dark:bg-[#202c33] dark:text-white'
-                                        )
+                                    ? 'bg-gray-200 text-gray-500 italic border border-gray-300'
+                                    : (isMe
+                                        ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none dark:bg-[#005c4b] dark:text-white'
+                                        : 'bg-white text-gray-800 rounded-tl-none dark:bg-[#202c33] dark:text-white'
+                                    )
                                     }`}
                                 onClick={(e) => {
                                     e.stopPropagation();

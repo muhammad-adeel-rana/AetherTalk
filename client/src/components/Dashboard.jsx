@@ -440,6 +440,17 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
         }
     };
 
+    // New Feature: Rename Contact Locally
+    const handleRenameContact = (contactId, newName) => {
+        if (!newName.trim()) return;
+        setContacts(prev => prev.map(c => {
+            if (c.id === contactId) {
+                return { ...c, name: newName.trim() };
+            }
+            return c;
+        }));
+    };
+
     const handleAddContact = (contactId, contactName) => {
         setContacts(prev => [
             ...prev,
@@ -453,14 +464,14 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
     };
 
     const activeMessages = activeContactId ? (chats[activeContactId] || []) : [];
-    const activeContact = contacts.find(c => c.id === activeContactId);
+    const activeContact = contacts.find(c => c.id === activeContactId) || (activeContactId ? { id: activeContactId } : null);
 
     return (
-        <div className={`flex h-screen overflow-hidden font-sans ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
+        <div className={`flex h-screen overflow-hidden ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
             {/* Sidebar: Hidden on Mobile if chat is open, Always visible on Desktop */}
             <div className={`${activeContactId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col h-full border-r ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
                 <Sidebar
-                    currentUser={user}
+                    user={user}
                     contacts={contacts}
                     activeContactId={activeContactId}
                     onSelectContact={setActiveContactId}
