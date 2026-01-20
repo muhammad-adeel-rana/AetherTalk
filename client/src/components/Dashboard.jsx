@@ -7,7 +7,7 @@ import { importKey, signMessage, verifyMessage } from '../utils/crypto';
 
 const SECRET_KEY = "my-super-secret-demo-key";
 
-const Dashboard = ({ user, onLogout }) => {
+const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
     const [contacts, setContacts] = useState(() => {
         const saved = localStorage.getItem(`chat_data_${user.username}`);
         return saved ? JSON.parse(saved).contacts || [] : [];
@@ -238,7 +238,30 @@ const Dashboard = ({ user, onLogout }) => {
             const originalString = bytes.toString(CryptoJS.enc.Utf8);
 
             if (originalString) {
-                const { text, time, signature } = JSON.parse(originalString);
+                const parsed = JSON.parse(originalString);
+
+                // Handle deletion
+                if (parsed.type === 'delete') {
+                    setChats(prev => ({
+                        ...prev,
+                        [senderId]: (prev[senderId] || []).map(msg =>
+                            msg.id === parsed.targetId
+                                ? { ...msg, deleted: true, text: '' } // Clear text for security
+                                : msg
+                        )
+                    }));
+                    // Also update last msg if it was deleted
+                    setContacts(prev => prev.map(c => {
+                        if (c.id === senderId && c.lastMessageId === parsed.targetId) {
+                            return { ...c, lastMessage: '🚫 This message was deleted' };
+                        }
+                        return c;
+                    }));
+                    return;
+                }
+
+                // Normal Message
+                const { id, text, time, signature } = parsed;
 
                 let isVerified = false;
                 const allUsers = JSON.parse(localStorage.getItem('chat_users') || '{}');
@@ -247,7 +270,8 @@ const Dashboard = ({ user, onLogout }) => {
                 if (senderUser && senderUser.publicKey && signature) {
                     try {
                         const publicKey = await importKey(senderUser.publicKey, "verify");
-                        isVerified = await verifyMessage(publicKey, text + time, signature);
+                        // Verify signature of ID + Text + Time
+                        isVerified = await verifyMessage(publicKey, id + text + time, signature);
                         console.log(`✅ Signature Verified for ${senderId}`);
                     } catch (e) {
                         console.error("Verification failed", e);
@@ -258,13 +282,16 @@ const Dashboard = ({ user, onLogout }) => {
 
                 setChats(prev => {
                     const chatHistory = prev[senderId] || [];
+                    // Dedup check (just in case)
+                    if (chatHistory.find(m => m.id === id)) return prev;
+
                     return {
                         ...prev,
-                        [senderId]: [...chatHistory, { sender: senderId, text, time, isVerified }]
+                        [senderId]: [...chatHistory, { id, sender: senderId, text, time, isVerified }]
                     };
                 });
 
-                updateContactLastMessage(senderId, text, time);
+                updateContactLastMessage(senderId, text, time, id);
 
                 setContacts(prev => {
                     if (!prev.find(c => c.id === senderId)) {
@@ -272,7 +299,8 @@ const Dashboard = ({ user, onLogout }) => {
                             id: senderId,
                             name: senderUser ? senderUser.username : senderId.substring(0, 6),
                             lastMessage: text,
-                            lastMessageTime: time
+                            lastMessageTime: time,
+                            lastMessageId: id
                         }];
                     }
                     return prev;
@@ -283,10 +311,15 @@ const Dashboard = ({ user, onLogout }) => {
         }
     };
 
-    const updateContactLastMessage = (contactId, text, time) => {
+    const updateContactLastMessage = (contactId, text, time, msgId) => {
         setContacts(prev => prev.map(c => {
             if (c.id === contactId) {
-                return { ...c, lastMessage: text, lastMessageTime: time };
+                return {
+                    ...c,
+                    lastMessage: text,
+                    lastMessageTime: time,
+                    lastMessageId: msgId
+                };
             }
             return c;
         }));
@@ -296,28 +329,32 @@ const Dashboard = ({ user, onLogout }) => {
         if (!activeContactId) return;
 
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const id = crypto.randomUUID();
 
         let signature = null;
         if (myPrivateKey) {
             try {
-                signature = await signMessage(myPrivateKey, text + time);
+                // Sign ID as well to prevent replay/tampering
+                signature = await signMessage(myPrivateKey, id + text + time);
             } catch (e) {
                 console.error("Signing failed", e);
             }
         }
 
-        const newMsg = { sender: 'me', text, time, isVerified: true };
+        const newMsg = { id, sender: 'me', text, time, isVerified: true };
         setChats(prev => ({
             ...prev,
             [activeContactId]: [...(prev[activeContactId] || []), newMsg]
         }));
 
-        updateContactLastMessage(activeContactId, text, time);
+        updateContactLastMessage(activeContactId, text, time, id);
 
+        // Send over wire
+        // ... (connection logic reuse)
         let conn = connectionsRef.current[activeContactId];
 
         const sendData = (connection) => {
-            const dataPacket = JSON.stringify({ text, time, signature });
+            const dataPacket = JSON.stringify({ type: 'msg', id, text, time, signature });
             const ciphertext = CryptoJS.AES.encrypt(dataPacket, SECRET_KEY).toString();
             console.log("🔒 [DEMO] Sending Encrypted Payload:", ciphertext);
             connection.send(ciphertext);
@@ -326,27 +363,62 @@ const Dashboard = ({ user, onLogout }) => {
         if (conn && conn.open) {
             sendData(conn);
         } else {
+            // ... existing connect logic ...
+            // Simplified for brevity in this replace block, essentially same as before but using sendData
             console.log(`Connecting to ${activeContactId}...`);
             setConnectionStatus('connecting');
             conn = peerRef.current.connect(activeContactId);
             setupConnection(conn);
 
-            setTimeout(() => {
-                if (!conn.open) {
-                    console.warn("Connection timeout");
-                }
-            }, 5000);
-
-            conn.on('open', () => {
-                sendData(conn);
-            });
+            // Wait briefly for open
+            conn.on('open', () => sendData(conn));
         }
     };
 
-    const handleAddContact = (contactId) => {
+    // New Feature: Delete Message
+    const handleDeleteMessage = (msgId, forEveryone) => {
+        if (!activeContactId) return;
+
+        // 1. Delete locally
+        setChats(prev => ({
+            ...prev,
+            [activeContactId]: (prev[activeContactId] || []).map(msg =>
+                msg.id === msgId ? { ...msg, deleted: true, text: '' } : msg
+            )
+        }));
+
+        // 2. Send delete signal if forEveryone
+        if (forEveryone) {
+            const conn = connectionsRef.current[activeContactId];
+            if (conn && conn.open) {
+                const dataPacket = JSON.stringify({ type: 'delete', targetId: msgId });
+                const ciphertext = CryptoJS.AES.encrypt(dataPacket, SECRET_KEY).toString();
+                conn.send(ciphertext);
+            }
+        }
+    };
+
+    // New Feature: Clear Chat
+    const handleClearChat = (contactId) => {
+        if (confirm("Are you sure you want to clear this chat? This cannot be undone.")) {
+            setChats(prev => {
+                const newChats = { ...prev };
+                delete newChats[contactId];
+                return newChats;
+            });
+            updateContactLastMessage(contactId, '', '', null);
+        }
+    };
+
+    const handleAddContact = (contactId, contactName) => {
         setContacts(prev => [
             ...prev,
-            { id: contactId, name: `User ${contactId.substring(0, 4)}`, lastMessage: '', lastMessageTime: '' }
+            {
+                id: contactId,
+                name: contactName || `User ${contactId.substring(0, 4)}`,
+                lastMessage: '',
+                lastMessageTime: ''
+            }
         ]);
     };
 
@@ -354,9 +426,9 @@ const Dashboard = ({ user, onLogout }) => {
     const activeContact = contacts.find(c => c.id === activeContactId);
 
     return (
-        <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
+        <div className={`flex h-screen overflow-hidden font-sans ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
             {/* Sidebar: Hidden on Mobile if chat is open, Always visible on Desktop */}
-            <div className={`${activeContactId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col h-full`}>
+            <div className={`${activeContactId ? 'hidden md:flex' : 'flex'} w-full md:w-80 flex-col h-full border-r ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
                 <Sidebar
                     currentUser={user}
                     contacts={contacts}
@@ -364,6 +436,8 @@ const Dashboard = ({ user, onLogout }) => {
                     onSelectContact={setActiveContactId}
                     onAddContact={handleAddContact}
                     onLogout={onLogout}
+                    theme={theme}
+                    toggleTheme={toggleTheme}
                 />
             </div>
 
@@ -373,9 +447,12 @@ const Dashboard = ({ user, onLogout }) => {
                     activeContact={activeContact}
                     messages={activeMessages}
                     onSendMessage={handleSendMessage}
+                    onDeleteMessage={handleDeleteMessage}
+                    onClearChat={() => handleClearChat(activeContactId)}
                     myId={user.peerId}
                     connectionStatus={connectionStatus}
                     onBack={() => setActiveContactId(null)}
+                    theme={theme}
                 />
             </div>
         </div>
