@@ -108,20 +108,28 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
             peer.on('connection', (conn) => {
                 console.log("Incoming connection from:", conn.peer);
 
-                // Anti-Glare (Race Condition) Handling:
-                // If we are currently trying to connect to this peer (outgoing), 
-                // we should "yield" and accept/use this incoming connection instead.
                 const existing = connectionsRef.current[conn.peer];
                 if (existing) {
                     if (existing.open) {
-                        console.log(`Already connected to ${conn.peer}, keeping EXISTING (Open).`);
-                        conn.close(); // Reject new if we have a happy open channel
-                        return; // Don't setup new
+                        console.log(`Already connected to ${conn.peer}, keeping EXISTING (Open). Closing Incoming.`);
+                        conn.close();
+                        return;
+                    }
+
+                    // Glare Handling (Tie-Breaker)
+                    // If both sides dial at the same time, we need a deterministic way to pick ONE connection.
+                    // We compare Peer IDs. 
+                    // Case 1: My ID > Their ID -> I am "Impolite". I win. I keep my outgoing. I reject their incoming.
+                    // Case 2: My ID < Their ID -> I am "Polite". I yield. I close my outgoing. I accept their incoming.
+
+                    if (user.peerId > conn.peer) {
+                        console.log(`Glare Detected. I (${user.peerId}) > Them (${conn.peer}). I win. Keeping my outgoing. Closing incoming.`);
+                        conn.close();
+                        return; // Keep existing pending connection
                     } else {
-                        // Existing is connecting/pending. Abandon it in favor of this incoming one.
-                        // This resolves 'Glare' where both sides try to connect at once.
-                        console.log(`Pending outgoing connection to ${conn.peer} found. Abandoning it for Incoming.`);
+                        console.log(`Glare Detected. I (${user.peerId}) < Them (${conn.peer}). I yield. Abandoning my outgoing. Accepting incoming.`);
                         existing.close();
+                        // Proceed to setupConnection(conn) below
                     }
                 }
                 setupConnection(conn);
@@ -403,15 +411,20 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
         }
     };
 
-    // New Feature: Clear Chat
+    // New Feature: Clear/Delete Contact
     const handleClearChat = (contactId) => {
-        if (confirm("Are you sure you want to clear this chat? This cannot be undone.")) {
+        if (confirm("Are you sure you want to delete this contact and all messages?")) {
+            // Remove messages
             setChats(prev => {
                 const newChats = { ...prev };
                 delete newChats[contactId];
                 return newChats;
             });
-            updateContactLastMessage(contactId, '', '', null);
+            // Remove contact
+            setContacts(prev => prev.filter(c => c.id !== contactId));
+
+            // Go back
+            setActiveContactId(null);
         }
     };
 
