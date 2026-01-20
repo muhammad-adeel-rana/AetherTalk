@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAddContact, onLogout, theme, toggleTheme }) => {
+const Sidebar = ({ user, contacts, activeContactId, onSelectContact, onAddContact, onLogout, theme, toggleTheme }) => {
     const [newContactId, setNewContactId] = useState('');
     const [newContactName, setNewContactName] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
@@ -21,7 +21,7 @@ const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAd
         }
 
         // Check if adding self
-        if (targetId === currentUser.peerId) {
+        if (targetId === user.peerId) {
             setAddError("You cannot add yourself.");
             return;
         }
@@ -50,9 +50,9 @@ const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAd
                 <div className={`flex items-center ${isCollapsed ? 'justify-center flex-col gap-2' : 'justify-between mb-3'}`}>
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-sm shrink-0">
-                            {currentUser.username[0].toUpperCase()}
+                            {user.username[0].toUpperCase()}
                         </div>
-                        {!isCollapsed && <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-800'}`}>{currentUser.username}</h3>}
+                        {!isCollapsed && <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-800'}`}>{user.displayName || user.username}</h3>}
                     </div>
 
                     {!isCollapsed && (
@@ -104,12 +104,12 @@ const Sidebar = ({ currentUser, contacts, activeContactId, onSelectContact, onAd
                         <p className={`text-[10px] uppercase font-bold mb-1 tracking-wider ${isDark ? 'text-gray-400' : 'text-gray-400'}`}>My Connection ID</p>
                         <div className={`flex items-center justify-between gap-2 p-1.5 rounded cursor-pointer transition group ${isDark ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-50 hover:bg-gray-100'}`}
                             onClick={() => {
-                                navigator.clipboard.writeText(currentUser.peerId);
+                                navigator.clipboard.writeText(user.peerId);
                                 alert("ID Copied to Clipboard!");
                             }}
                             title="Click to Copy"
                         >
-                            <code className="text-xs text-blue-500 font-mono truncate select-all">{currentUser.peerId}</code>
+                            <code className="text-xs text-blue-500 font-mono truncate select-all">{user.peerId}</code>
                             <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 012-2v-8a2 2 0 01-2-2h-8a2 2 0 01-2 2v8a2 2 0 012 2z" />
                             </svg>
