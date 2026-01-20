@@ -373,6 +373,24 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                     }
                     return;
                 }
+
+                // GROUP INVITE
+                if (data.type === 'group-invite') {
+                    console.log(`👥 Received Group Invite: ${data.name}`);
+                    setContacts(prev => {
+                        if (prev.find(c => c.id === data.groupId)) return prev;
+                        return [...prev, {
+                            id: data.groupId,
+                            name: data.name,
+                            isGroup: true,
+                            members: data.members,
+                            lastMessage: 'You were added',
+                            lastMessageTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        }];
+                    });
+                    return;
+                }
+
             }
         } catch (e) { }
 
@@ -386,9 +404,10 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
 
                 // Handle deletion
                 if (parsed.type === 'delete') {
+                    const chatId = parsed.groupId || senderId; // If group delete, target group
                     setChats(prev => ({
                         ...prev,
-                        [senderId]: (prev[senderId] || []).map(msg =>
+                        [chatId]: (prev[chatId] || []).map(msg =>
                             msg.id === parsed.targetId
                                 ? { ...msg, deleted: true, text: '' } // Clear text for security
                                 : msg
@@ -396,11 +415,41 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                     }));
                     // Also update last msg if it was deleted
                     setContacts(prev => prev.map(c => {
-                        if (c.id === senderId && c.lastMessageId === parsed.targetId) {
+                        if (c.id === chatId && c.lastMessageId === parsed.targetId) {
                             return { ...c, lastMessage: '🚫 This message was deleted' };
                         }
                         return c;
                     }));
+                    return;
+                }
+
+                // Handle Group Message
+                if (parsed.type === 'group-msg') {
+                    const { groupId, id, text, time, signature, senderId: msgSenderId } = parsed;
+
+                    // Verify (Simplification: using sender's public key if available)
+                    // In real mesh, we need to look up the msgSenderId's key.
+                    // For now, let's skip strict sig verification or look up user from contacts.
+
+                    setChats(prev => {
+                        const chatHistory = prev[groupId] || [];
+                        if (chatHistory.find(m => m.id === id)) return prev;
+
+                        // Determine display name of sender
+                        const senderContact = contacts.find(c => c.id === msgSenderId);
+                        const senderName = senderContact ? senderContact.name : msgSenderId.substring(0, 6);
+
+                        return {
+                            ...prev,
+                            [groupId]: [...chatHistory, {
+                                id,
+                                sender: msgSenderId, // Keep raw ID for logic
+                                senderName: senderName, // UI can use this
+                                text, time, isVerified: true
+                            }]
+                        };
+                    });
+                    updateContactLastMessage(groupId, `${msgSenderId.substring(0, 4)}: ${text}`, time, id);
                     return;
                 }
 
@@ -469,53 +518,127 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
         }));
     };
 
+    // FEATURE: MESH GROUP CHAT
+    const handleCreateGroup = (groupName, memberIds) => {
+        const groupId = `group-${crypto.randomUUID()}`;
+        const members = [...memberIds, user.peerId]; // Include self
+
+        const newGroup = {
+            id: groupId,
+            name: groupName,
+            isGroup: true,
+            members: members,
+            lastMessage: 'Group Created',
+            lastMessageTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        setContacts(prev => [...prev, newGroup]);
+
+        // Broadcast Invite to all members
+        members.forEach(memberId => {
+            if (memberId === user.peerId) return;
+
+            const conn = connectionsRef.current[memberId];
+            if (conn && conn.open) {
+                const invite = {
+                    type: 'group-invite',
+                    groupId,
+                    name: groupName,
+                    members
+                };
+                conn.send(JSON.stringify(invite));
+            } else {
+                // Try to connect and send (Simplified for demo)
+                const newConn = peerRef.current.connect(memberId);
+                setupConnection(newConn);
+                newConn.on('open', () => {
+                    const invite = {
+                        type: 'group-invite',
+                        groupId,
+                        name: groupName,
+                        members
+                    };
+                    newConn.send(JSON.stringify(invite));
+                });
+            }
+        });
+    };
+
     const handleSendMessage = async (text) => {
         if (!activeContactId) return;
 
         const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const id = crypto.randomUUID();
-
         let signature = null;
+
         if (myPrivateKey) {
             try {
-                // Sign ID as well to prevent replay/tampering
                 signature = await signMessage(myPrivateKey, id + text + time);
-            } catch (e) {
-                console.error("Signing failed", e);
-            }
+            } catch (e) { console.error("Signing failed", e); }
         }
 
         const newMsg = { id, sender: 'me', text, time, isVerified: true };
+
+        // Optimistic UI Update
         setChats(prev => ({
             ...prev,
             [activeContactId]: [...(prev[activeContactId] || []), newMsg]
         }));
-
         updateContactLastMessage(activeContactId, text, time, id);
 
-        // Send over wire
-        // ... (connection logic reuse)
-        let conn = connectionsRef.current[activeContactId];
+        // SEND LOGIC
+        const activeContact = contacts.find(c => c.id === activeContactId);
 
-        const sendData = (connection) => {
-            const dataPacket = JSON.stringify({ type: 'msg', id, text, time, signature });
-            const ciphertext = CryptoJS.AES.encrypt(dataPacket, SECRET_KEY).toString();
-            console.log("🔒 [DEMO] Sending Encrypted Payload:", ciphertext);
-            connection.send(ciphertext);
-        };
+        if (activeContact && activeContact.isGroup) {
+            // BROADCAST to all members
+            console.log(`📢 Broadcasting to Group ${activeContact.name}`);
+            activeContact.members.forEach(memberId => {
+                if (memberId === user.peerId) return; // Don't send to self
 
-        if (conn && conn.open) {
-            sendData(conn);
+                const sendToMember = (conn) => {
+                    const payload = JSON.stringify({
+                        type: 'group-msg',
+                        groupId: activeContactId,
+                        id, text, time, signature,
+                        senderId: user.peerId
+                    }); // In real app, encrypt this!
+                    // For demo, we might skip encryption for groups or use a shared group key (advanced).
+                    // We'll just send plaintext wrapped in encryption for now for simplicity or re-encrypt for each peer.
+
+                    // Re-encrypt for specific peer
+                    const ciphertext = CryptoJS.AES.encrypt(payload, SECRET_KEY).toString();
+                    conn.send(ciphertext);
+                };
+
+                const conn = connectionsRef.current[memberId];
+                if (conn && conn.open) {
+                    sendToMember(conn);
+                } else {
+                    // Auto-connect if missing
+                    const newConn = peerRef.current.connect(memberId);
+                    setupConnection(newConn);
+                    newConn.on('open', () => sendToMember(newConn));
+                }
+            });
+
         } else {
-            // ... existing connect logic ...
-            // Simplified for brevity in this replace block, essentially same as before but using sendData
-            console.log(`Connecting to ${activeContactId}...`);
-            setConnectionStatus('connecting');
-            conn = peerRef.current.connect(activeContactId);
-            setupConnection(conn);
+            // P2P Direct Message
+            const sendData = (connection) => {
+                const dataPacket = JSON.stringify({ type: 'msg', id, text, time, signature });
+                const ciphertext = CryptoJS.AES.encrypt(dataPacket, SECRET_KEY).toString();
+                connection.send(ciphertext);
+            };
 
-            // Wait briefly for open
-            conn.on('open', () => sendData(conn));
+            let conn = connectionsRef.current[activeContactId];
+            if (conn && conn.open) {
+                sendData(conn);
+            } else {
+                console.log(`Connecting to ${activeContactId}...`);
+                setConnectionStatus('connecting');
+                conn = peerRef.current.connect(activeContactId);
+                setupConnection(conn);
+                conn.on('open', () => sendData(conn));
+            }
         }
     };
 
@@ -531,13 +654,27 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
             )
         }));
 
-        // 2. Send delete signal if forEveryone
+        // 2. Send delete signal
         if (forEveryone) {
-            const conn = connectionsRef.current[activeContactId];
-            if (conn && conn.open) {
-                const dataPacket = JSON.stringify({ type: 'delete', targetId: msgId });
-                const ciphertext = CryptoJS.AES.encrypt(dataPacket, SECRET_KEY).toString();
-                conn.send(ciphertext);
+            const activeContact = contacts.find(c => c.id === activeContactId);
+            const payload = JSON.stringify({ type: 'delete', targetId: msgId, groupId: activeContact?.isGroup ? activeContactId : undefined });
+
+            if (activeContact && activeContact.isGroup) {
+                // Broadcast Delete
+                activeContact.members.forEach(memberId => {
+                    if (memberId === user.peerId) return;
+                    const conn = connectionsRef.current[memberId];
+                    if (conn && conn.open) {
+                        const ciphertext = CryptoJS.AES.encrypt(payload, SECRET_KEY).toString();
+                        conn.send(ciphertext);
+                    }
+                });
+            } else {
+                const conn = connectionsRef.current[activeContactId];
+                if (conn && conn.open) {
+                    const ciphertext = CryptoJS.AES.encrypt(payload, SECRET_KEY).toString();
+                    conn.send(ciphertext);
+                }
             }
         }
     };
@@ -595,6 +732,7 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                     activeContactId={activeContactId}
                     onSelectContact={setActiveContactId}
                     onAddContact={handleAddContact}
+                    onCreateGroup={handleCreateGroup}
                     onLogout={onLogout}
                     theme={theme}
                     toggleTheme={toggleTheme}

@@ -1,9 +1,15 @@
 import { useState } from 'react';
 
-const Sidebar = ({ user, contacts, activeContactId, onSelectContact, onAddContact, onLogout, theme, toggleTheme }) => {
+const Sidebar = ({ user, contacts, activeContactId, onSelectContact, onAddContact, onCreateGroup, onLogout, theme, toggleTheme }) => {
     const [newContactId, setNewContactId] = useState('');
     const [newContactName, setNewContactName] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
+
+    // Group Creation State
+    const [showGroupModal, setShowGroupModal] = useState(false);
+    const [groupName, setGroupName] = useState('');
+    const [selectedGroupMembers, setSelectedGroupMembers] = useState([]);
+
     const [addError, setAddError] = useState('');
     const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -14,19 +20,16 @@ const Sidebar = ({ user, contacts, activeContactId, onSelectContact, onAddContac
             return;
         }
 
-        // Smart ID Handling
         let targetId = newContactId.trim();
         if (/^\d+$/.test(targetId)) {
             targetId = `phone-${targetId}`;
         }
 
-        // Check if adding self
         if (targetId === user.peerId) {
             setAddError("You cannot add yourself.");
             return;
         }
 
-        // Check if already exists
         if (contacts.find(c => c.id === targetId)) {
             setAddError("Contact already exists.");
             return;
@@ -39,10 +42,35 @@ const Sidebar = ({ user, contacts, activeContactId, onSelectContact, onAddContac
         setAddError('');
     };
 
+    const handleCreateGroup = (e) => {
+        e.preventDefault();
+        if (!groupName.trim()) {
+            setAddError("Group Name is required.");
+            return;
+        }
+        if (selectedGroupMembers.length < 2) {
+            setAddError("Select at least 2 members.");
+            return;
+        }
+
+        onCreateGroup(groupName.trim(), selectedGroupMembers);
+        setGroupName('');
+        setSelectedGroupMembers([]);
+        setShowGroupModal(false);
+        setAddError('');
+    };
+
+    const toggleGroupMember = (contactId) => {
+        setSelectedGroupMembers(prev =>
+            prev.includes(contactId)
+                ? prev.filter(id => id !== contactId)
+                : [...prev, contactId]
+        );
+    };
+
     const isDark = theme === 'dark';
 
     return (
-        // Dynamic width based on collapsed state
         <div className={`flex flex-col h-full transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-80'} ${isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-r border-gray-200'}`}>
 
             {/* User Profile Header */}
@@ -89,7 +117,7 @@ const Sidebar = ({ user, contacts, activeContactId, onSelectContact, onAddContac
                     </div>
                 )}
 
-                {/* Sidebar Toggle Button (Inside Header) */}
+                {/* Sidebar Toggle Button */}
                 <button
                     onClick={() => setIsCollapsed(!isCollapsed)}
                     className={`absolute top-1/2 -right-3 transform -translate-y-1/2 bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md z-10 hover:bg-blue-600 md:flex hidden`}
@@ -140,15 +168,15 @@ const Sidebar = ({ user, contacts, activeContactId, onSelectContact, onAddContac
                                 } ${isCollapsed ? 'justify-center px-2' : ''}`}
                             title={contact.name}
                         >
-                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold shrink-0">
-                                {contact?.name ? contact.name[0].toUpperCase() : (contact?.id ? contact.id.substring(0, 2).toUpperCase() : '?')}
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0 ${contact.isGroup ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-200 text-gray-600'}`}>
+                                {contact.isGroup ? '👥' : (contact.name ? contact.name[0].toUpperCase() : '?')}
                             </div>
 
                             {!isCollapsed && (
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-baseline mb-1">
                                         <h4 className={`font-semibold truncate ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
-                                            {contact?.name || contact?.id || 'Unknown'}
+                                            {contact.name || contact.id || 'Unknown'}
                                         </h4>
                                         {contact.lastMessageTime && (
                                             <span className="text-[10px] text-gray-400">
@@ -166,14 +194,24 @@ const Sidebar = ({ user, contacts, activeContactId, onSelectContact, onAddContac
                 )}
             </div>
 
-            {/* Add Contact Button */}
-            <div className={`p-4 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            {/* Bottom Actions */}
+            <div className={`p-4 border-t flex flex-col gap-2 ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
                 <button
                     onClick={() => setShowAddModal(true)}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold transition flex items-center justify-center gap-2"
                 >
                     <span className="text-xl leading-none">+</span>
-                    {!isCollapsed && "Add New Chat"}
+                    {!isCollapsed && "Add Contact"}
+                </button>
+                <button
+                    onClick={() => {
+                        // Filter out existing groups from the selection list logic
+                        setShowGroupModal(true)
+                    }}
+                    className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg font-bold transition flex items-center justify-center gap-2"
+                >
+                    <span className="text-xl leading-none">👥</span>
+                    {!isCollapsed && "Create Group"}
                 </button>
             </div>
 
@@ -215,6 +253,66 @@ const Sidebar = ({ user, contacts, activeContactId, onSelectContact, onAddContac
                                     className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                                 >
                                     Add Friendly
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Group Modal */}
+            {showGroupModal && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className={`p-6 rounded-xl shadow-2xl w-80 max-h-[90vh] flex flex-col animate-bounce-in ${isDark ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
+                        <h3 className="font-bold text-lg mb-4">Create New Group</h3>
+                        <form onSubmit={handleCreateGroup} className="flex-1 flex flex-col min-h-0">
+                            <label className="text-xs font-semibold mb-1 block uppercase text-gray-500">Group Name</label>
+                            <input
+                                className={`w-full border rounded px-3 py-2 mb-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none ${isDark ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                                placeholder="E.g. Project Build"
+                                value={groupName}
+                                onChange={(e) => setGroupName(e.target.value)}
+                                autoFocus
+                            />
+
+                            <label className="text-xs font-semibold mb-2 block uppercase text-gray-500">Select Members</label>
+                            <div className={`flex-1 overflow-y-auto mb-4 border rounded p-2 ${isDark ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'}`}>
+                                {contacts.filter(c => !c.isGroup).length === 0 ? (
+                                    <p className="text-center text-gray-400 text-xs py-4">No contacts available to add.</p>
+                                ) : (
+                                    contacts.filter(c => !c.isGroup).map(contact => (
+                                        <div
+                                            key={contact.id}
+                                            onClick={() => toggleGroupMember(contact.id)}
+                                            className={`flex items-center gap-2 p-2 rounded cursor-pointer mb-1 ${selectedGroupMembers.includes(contact.id)
+                                                    ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+                                                    : (isDark ? 'hover:bg-gray-600' : 'hover:bg-white')
+                                                }`}
+                                        >
+                                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${selectedGroupMembers.includes(contact.id) ? 'bg-indigo-500 border-indigo-500' : 'border-gray-400'}`}>
+                                                {selectedGroupMembers.includes(contact.id) && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
+                                            </div>
+                                            <span className="text-sm truncate font-medium">{contact.name || contact.id}</span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {addError && <p className="text-red-500 text-xs mb-3">{addError}</p>}
+
+                            <div className="flex gap-2 justify-end mt-auto">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowGroupModal(false); setAddError(''); setSelectedGroupMembers([]); }}
+                                    className={`px-3 py-1.5 text-sm rounded ${isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                >
+                                    Create Group
                                 </button>
                             </div>
                         </form>

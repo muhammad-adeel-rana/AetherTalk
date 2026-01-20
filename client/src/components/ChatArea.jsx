@@ -167,11 +167,11 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
                         >
                             <div
                                 className={`px-3 py-1.5 rounded-lg shadow-sm text-sm relative group cursor-pointer ${msg.deleted
-                                        ? 'bg-gray-200 text-gray-500 italic border border-gray-300'
-                                        : (isMe
-                                            ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none dark:bg-[#005c4b] dark:text-white'
-                                            : 'bg-white text-gray-800 rounded-tl-none dark:bg-[#202c33] dark:text-white'
-                                        )
+                                    ? 'bg-gray-200 text-gray-500 italic border border-gray-300'
+                                    : (isMe
+                                        ? 'bg-[#d9fdd3] text-gray-800 rounded-tr-none dark:bg-[#005c4b] dark:text-white'
+                                        : 'bg-white text-gray-800 rounded-tl-none dark:bg-[#202c33] dark:text-white'
+                                    )
                                     }`}
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -180,6 +180,13 @@ const ChatArea = ({ activeContact, messages, onSendMessage, onSendFile, onDelete
                                 }}
                             >
                                 <div className="flex flex-col">
+                                    {/* Show sender name in group chats */}
+                                    {!isMe && activeContact?.isGroup && msg.senderName && (
+                                        <span className={`text-xs font-semibold mb-0.5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+                                            {msg.senderName}
+                                        </span>
+                                    )}
+
                                     {msg.deleted ? (
                                         <span>🚫 {isMe ? "You deleted this message" : "This message was deleted"}</span>
                                     ) : (
