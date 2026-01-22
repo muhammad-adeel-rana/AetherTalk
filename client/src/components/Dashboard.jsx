@@ -96,28 +96,20 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' },
-                        { urls: 'stun:stun3.l.google.com:19302' },
-                        { urls: 'stun:stun4.l.google.com:19302' },
+                        { urls: 'stun:stun.cloudflare.com:3478' },
                         // OpenRelay Free TURN Server (Metered.ca)
-                        // This helps traverse Symmetric NATs (Mobile Data)
                         {
                             urls: 'turn:openrelay.metered.ca:80',
                             username: 'openrelayproject',
                             credential: 'openrelayproject'
                         },
                         {
-                            urls: 'turn:openrelay.metered.ca:443',
-                            username: 'openrelayproject',
-                            credential: 'openrelayproject'
-                        },
-                        {
-                            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                            urls: 'turns:openrelay.metered.ca:443',
                             username: 'openrelayproject',
                             credential: 'openrelayproject'
                         }
-                    ]
+                    ],
+                    iceTransportPolicy: 'all'
                 }
             });
 
@@ -131,14 +123,22 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                 const existing = connectionsRef.current[conn.peer];
                 if (existing) {
                     if (existing.open) {
-                        console.log(`Already connected to ${conn.peer}, keeping EXISTING (Open). Closing Incoming.`);
+                        console.log(`Already connected to ${conn.peer}, closing incoming.`);
                         conn.close();
                         return;
                     }
-                    // If existing is not open (pending), we let them race.
-                    // We simply accept this new incoming connection as well.
-                    // The first one to 'open' will update the UI and become active.
-                    console.log(`Connection Race: Accepting incoming from ${conn.peer} to race with pending outgoing.`);
+
+                    // GLARE HANDLING: If both sides initiate simultaneously
+                    // Logic: The side with the "smaller" ID wins the initiation race.
+                    if (user.peerId < conn.peer) {
+                        console.log(`Glare: We are smaller ID (${user.peerId} < ${conn.peer}), keeping our outgoing, closing incoming.`);
+                        conn.close();
+                        return;
+                    } else {
+                        console.log(`Glare: We are larger ID (${user.peerId} > ${conn.peer}), closing our outgoing, accepting incoming.`);
+                        existing.close();
+                        // Proceed to setup this new incoming connection
+                    }
                 }
                 setupConnection(conn);
             });
