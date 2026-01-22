@@ -93,10 +93,16 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
 
         const initializePeer = () => {
             peer = new Peer(user.peerId, {
+                host: window.location.hostname,
+                port: 9000,
+                path: '/myapp',
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
                         { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' },
                         // OpenRelay Free TURN Server (Metered.ca)
                         // This helps traverse Symmetric NATs (Mobile Data)
                         {
