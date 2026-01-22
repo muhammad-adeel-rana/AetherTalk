@@ -60,6 +60,8 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
             const conn = connectionsRef.current[activeContactId];
             if (conn && conn.open) {
                 setConnectionStatus('connected');
+            } else if (connectionStatus === 'connecting') {
+                console.log(`Connection attempt to ${activeContactId} already in progress, skipping...`);
             } else {
                 setConnectionStatus('disconnected');
                 // Auto-Connect attempt if we are PeerReady
@@ -93,25 +95,20 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
 
         const initializePeer = () => {
             peer = new Peer(user.peerId, {
-                debug: 3, // Increased debug level
+                debug: 3,
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun.cloudflare.com:3478' },
                         {
-                            urls: 'turn:openrelay.metered.ca:80',
-                            username: 'openrelayproject',
-                            credential: 'openrelayproject'
-                        },
-                        {
-                            urls: 'turn:openrelay.metered.ca:443?transport=tcp', // Forced TCP for better stability
+                            urls: [
+                                'turn:openrelay.metered.ca:80',
+                                'turn:openrelay.metered.ca:443?transport=tcp'
+                            ],
                             username: 'openrelayproject',
                             credential: 'openrelayproject'
                         }
                     ],
-                    iceTransportPolicy: 'all',
-                    iceCandidatePoolSize: 10
+                    iceTransportPolicy: 'all'
                 }
             });
 
@@ -133,13 +130,15 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                     // GLARE HANDLING: If both sides initiate simultaneously
                     // Logic: The side with the "smaller" ID wins the initiation race.
                     if (user.peerId < conn.peer) {
-                        console.warn(`Glare Detected: We (${user.peerId}) < Remote (${conn.peer}). Keeping our outgoing, closing incoming.`);
+                        console.warn(`Glare Detected: We (${user.peerId}) are the initiator (smaller ID). Closing incoming to let our outgoing finish.`);
                         conn.close();
                         return;
                     } else {
-                        console.warn(`Glare Detected: We (${user.peerId}) > Remote (${conn.peer}). Closing our outgoing, accepting incoming.`);
-                        if (existing && existing.close) existing.close();
-                        delete connectionsRef.current[conn.peer];
+                        console.warn(`Glare Detected: We (${user.peerId}) are the receiver (larger ID). Closing our outgoing and accepting incoming.`);
+                        if (existing) {
+                            existing.close();
+                            delete connectionsRef.current[conn.peer];
+                        }
                     }
                 }
                 setupConnection(conn);
