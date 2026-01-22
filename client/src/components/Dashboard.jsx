@@ -93,23 +93,25 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
 
         const initializePeer = () => {
             peer = new Peer(user.peerId, {
+                debug: 3, // Increased debug level
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
                         { urls: 'stun:stun.cloudflare.com:3478' },
-                        // OpenRelay Free TURN Server (Metered.ca)
                         {
                             urls: 'turn:openrelay.metered.ca:80',
                             username: 'openrelayproject',
                             credential: 'openrelayproject'
                         },
                         {
-                            urls: 'turns:openrelay.metered.ca:443',
+                            urls: 'turn:openrelay.metered.ca:443?transport=tcp', // Forced TCP for better stability
                             username: 'openrelayproject',
                             credential: 'openrelayproject'
                         }
                     ],
-                    iceTransportPolicy: 'all'
+                    iceTransportPolicy: 'all',
+                    iceCandidatePoolSize: 10
                 }
             });
 
@@ -131,13 +133,13 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                     // GLARE HANDLING: If both sides initiate simultaneously
                     // Logic: The side with the "smaller" ID wins the initiation race.
                     if (user.peerId < conn.peer) {
-                        console.log(`Glare: We are smaller ID (${user.peerId} < ${conn.peer}), keeping our outgoing, closing incoming.`);
+                        console.warn(`Glare Detected: We (${user.peerId}) < Remote (${conn.peer}). Keeping our outgoing, closing incoming.`);
                         conn.close();
                         return;
                     } else {
-                        console.log(`Glare: We are larger ID (${user.peerId} > ${conn.peer}), closing our outgoing, accepting incoming.`);
-                        existing.close();
-                        // Proceed to setup this new incoming connection
+                        console.warn(`Glare Detected: We (${user.peerId}) > Remote (${conn.peer}). Closing our outgoing, accepting incoming.`);
+                        if (existing && existing.close) existing.close();
+                        delete connectionsRef.current[conn.peer];
                     }
                 }
                 setupConnection(conn);
