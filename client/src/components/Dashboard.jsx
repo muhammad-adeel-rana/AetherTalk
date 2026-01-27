@@ -83,7 +83,7 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                 console.log(`Polling: Retrying connection to ${activeContactId}...`);
                 checkConnection();
             }
-        }, 5000);
+        }, 10000); // Increased to 10s to give ICE more time
 
         return () => clearInterval(interval);
     }, [activeContactId]);
@@ -99,16 +99,22 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' },
                         {
                             urls: [
                                 'turn:openrelay.metered.ca:80',
-                                'turn:openrelay.metered.ca:443?transport=tcp'
+                                'turn:openrelay.metered.ca:443?transport=tcp',
+                                'turn:openrelay.metered.ca:443?transport=udp'
                             ],
                             username: 'openrelayproject',
                             credential: 'openrelayproject'
                         }
                     ],
-                    iceTransportPolicy: 'all'
+                    iceTransportPolicy: 'all',
+                    iceCandidatePoolSize: 10
                 }
             });
 
@@ -223,6 +229,10 @@ const Dashboard = ({ user, onLogout, theme, toggleTheme }) => {
         conn.on('error', (err) => {
             console.error("Connection Error:", err);
             if (conn.peer === activeContactId) setConnectionStatus('error');
+
+            // Cleanup on error
+            conn.close();
+            delete connectionsRef.current[conn.peer];
         });
     };
 
